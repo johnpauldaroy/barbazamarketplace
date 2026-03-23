@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 220 100% 98%;
+  --foreground: 224 53% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 53% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 53% 15%;
+  --primary: 223 66% 47%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 100% 97%;
+  --secondary-foreground: 224 53% 15%;
+  --muted: 214 60% 96%;
+  --muted-foreground: 215 22% 47%;
+  --accent: 201 100% 59%;
+  --accent-foreground: 224 53% 15%;
+  --destructive: 348 86% 61%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 40% 90%;
+  --input: 216 40% 90%;
+  --ring: 223 66% 47%;
+  --radius: 1rem;
+  --market-navy: #0b1739;
+  --market-blue: #2954c8;
+  --market-sky: #2ea7ff;
+  --market-soft: #f4f7fd;
+  --market-line: #dfe7f4;
+  --market-success: #12b981;
+  --market-warm: #f6c343;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+      radial-gradient(circle at top left, rgba(46, 167, 255, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(41, 84, 200, 0.08), transparent 24%),
+      linear-gradient(180deg, #f8fbff 0%, #f4f7fd 34%, #eef3fb 100%);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(41, 84, 200, 0.16);
+  }
+}
+
+@layer utilities {
+  .surface-card {
+    @apply rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur;
+  }
+
+  .surface-subtle {
+    @apply rounded-[24px] border border-[#dfe7f4] bg-[#f8fbff];
+  }
+}
+

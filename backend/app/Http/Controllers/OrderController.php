@@ -1,0 +1,400 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class OrderController extends Controller
+{
+    protected const STATUS_FLOW = [
+        'pending',
+        'processing',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'refunded',
+    ];
+
+    public function index()
+    {
+        $user = Auth::user();
+        if ($user && $user->is_admin) {
+            $orders = Order::with(['items.product', 'user'])->latest()->get();
+        } else {
+            $orders = Order::where('user_id', Auth::id())
+                ->with(['items.product', 'user'])
+                ->latest()
+                ->get();
+        }
+
+        return response()->json([
+            'orders' => $orders->map(fn (Order $order) => $this->formatOrderResponse($order))->values(),
+        ]);
+    }
+
+    public function adminSummary()
+    {
+        $orders = Order::with(['items.product', 'user'])->latest()->get();
+        $products = Product::query()->orderBy('title')->get();
+        $productSales = OrderItem::query()
+            ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(quantity * price) as revenue'))
+            ->groupBy('product_id')
+            ->get()
+            ->keyBy('product_id');
+
+        $revenueOrders = $orders->filter(fn (Order $order) => !$this->isInventoryRestored($order->status));
+        $totalRevenue = $revenueOrders->sum(fn (Order $order) => (float) $order->total_amount);
+        $uniqueCustomers = $orders
+            ->map(fn (Order $order) => strtolower((string) ($order->customer_email ?: optional($order->user)->email ?: "guest-{$order->id}")))
+            ->filter()
+            ->unique()
+            ->count();
+
+        $monthlySales = collect(range(5, 0))
+            ->map(function (int $monthsAgo) use ($revenueOrders) {
+                $date = now()->startOfMonth()->subMonths($monthsAgo);
+                $monthOrders = $revenueOrders->filter(
+                    fn (Order $order) => optional($order->created_at)->format('Y-m') === $date->format('Y-m')
+                );
+
+                return [
+                    'month' => $date->format('Y-m'),
+                    'label' => $date->format('M'),
+                    'orders' => $monthOrders->count(),
+                    'revenue' => round($monthOrders->sum(fn (Order $order) => (float) $order->total_amount), 2),
+                ];
+            })
+            ->values();
+
+        $statusBreakdown = collect(self::STATUS_FLOW)
+            ->map(function (string $status) use ($orders) {
+                return [
+                    'name' => ucfirst($status),
+                    'status' => $status,
+                    'count' => $orders->where('status', $status)->count(),
+                ];
+            })
+            ->filter(fn (array $item) => $item['count'] > 0)
+            ->values();
+
+        $topProducts = $products
+            ->map(function (Product $product) use ($productSales) {
+                $sales = $productSales->get($product->id);
+                return [
+                    'id' => $product->id,
+                    'title' => $product->title,
+                    'category' => $product->category,
+                    'image' => $product->image,
+                    'image_url' => $product->image_url,
+                    'stock' => (int) $product->stock,
+                    'units_sold' => (int) ($sales->units_sold ?? 0),
+                    'revenue' => round((float) ($sales->revenue ?? 0), 2),
+                ];
+            })
+            ->sort(function (array $left, array $right) {
+                if ($left['units_sold'] === $right['units_sold']) {
+                    return $right['revenue'] <=> $left['revenue'];
+                }
+
+                return $right['units_sold'] <=> $left['units_sold'];
+            })
+            ->take(5)
+            ->values();
+
+        $lowStockProducts = $products
+            ->filter(fn (Product $product) => (int) $product->stock <= 10)
+            ->sortBy('stock')
+            ->take(6)
+            ->map(fn (Product $product) => [
+                'id' => $product->id,
+                'title' => $product->title,
+                'category' => $product->category,
+                'stock' => (int) $product->stock,
+                'image' => $product->image,
+                'image_url' => $product->image_url,
+            ])
+            ->values();
+
+        return response()->json([
+            'summary' => [
+                'total_revenue' => round($totalRevenue, 2),
+                'total_orders' => $orders->count(),
+                'pending_orders' => $orders->where('status', 'pending')->count(),
+                'processing_orders' => $orders->where('status', 'processing')->count(),
+                'shipped_orders' => $orders->where('status', 'shipped')->count(),
+                'delivered_orders' => $orders->where('status', 'delivered')->count(),
+                'cancelled_orders' => $orders->where('status', 'cancelled')->count(),
+                'refunded_orders' => $orders->where('status', 'refunded')->count(),
+                'average_order_value' => $revenueOrders->count() > 0 ? round($totalRevenue / $revenueOrders->count(), 2) : 0,
+                'unique_customers' => $uniqueCustomers,
+                'total_products' => $products->count(),
+                'active_categories' => $products->pluck('category')->filter()->unique()->count(),
+                'low_stock_products' => $products->filter(fn (Product $product) => (int) $product->stock <= 10)->count(),
+                'out_of_stock_products' => $products->filter(fn (Product $product) => (int) $product->stock <= 0)->count(),
+            ],
+            'monthly_sales' => $monthlySales,
+            'status_breakdown' => $statusBreakdown,
+            'top_products' => $topProducts,
+            'low_stock_products' => $lowStockProducts,
+            'recent_orders' => $orders
+                ->take(8)
+                ->map(fn (Order $order) => $this->formatOrderResponse($order))
+                ->values(),
+        ]);
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $request->validate([
+            'status' => ['required', 'string', Rule::in(self::STATUS_FLOW)],
+        ]);
+
+        $order = Order::with(['items.product', 'user'])->findOrFail($id);
+        if (!$user->is_admin && $order->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $nextStatus = strtolower((string) $request->status);
+        $previousStatus = strtolower((string) $order->status);
+
+        DB::transaction(function () use ($order, $previousStatus, $nextStatus) {
+            if (!$this->isInventoryRestored($previousStatus) && $this->isInventoryRestored($nextStatus)) {
+                $this->restoreInventoryForOrder($order);
+            }
+
+            if ($this->isInventoryRestored($previousStatus) && !$this->isInventoryRestored($nextStatus)) {
+                $this->reserveInventoryForOrder($order);
+            }
+
+            $order->status = $nextStatus;
+            $order->save();
+        });
+
+        $order->refresh()->load(['items.product', 'user']);
+
+        return response()->json([
+            'message' => 'Order status updated',
+            'order' => $this->formatOrderResponse($order)
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $request->validate([
+            'items' => 'required|array',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'nullable|numeric',
+            'subtotal_amount' => 'nullable|numeric|min:0',
+            'shipping_fee' => 'nullable|numeric|min:0',
+            'total_amount' => 'nullable|numeric|min:0',
+            'shipping_address' => 'required|string',
+            'shipping_city' => 'nullable|string',
+            'customer_name' => 'nullable|string',
+            'customer_email' => 'nullable|email',
+            'customer_phone' => 'nullable|string',
+            'payment_method' => 'nullable|string',
+            'payment_reference' => 'nullable|string',
+            'customer' => 'nullable|array',
+            'customer.fullName' => 'nullable|string',
+            'customer.name' => 'nullable|string',
+            'customer.email' => 'nullable|email',
+            'customer.phone' => 'nullable|string',
+            'customer.paymentMethod' => 'nullable|string',
+        ]);
+
+        try {
+            DB::beginTransaction();
+            $customer = $request->input('customer', []);
+            $shippingFee = round((float) $request->input('shipping_fee', 0), 2);
+            $customerName = $request->input('customer_name')
+                ?? $customer['fullName']
+                ?? $customer['name']
+                ?? null;
+            $customerEmail = $request->input('customer_email')
+                ?? $customer['email']
+                ?? null;
+            $customerPhone = $request->input('customer_phone')
+                ?? $customer['phone']
+                ?? null;
+            $paymentMethod = $request->input('payment_method')
+                ?? $customer['paymentMethod']
+                ?? null;
+            $paymentReference = $request->input('payment_reference');
+            $itemsPayload = collect($request->items);
+            $products = Product::lockForUpdate()
+                ->whereIn('id', $itemsPayload->pluck('product_id')->all())
+                ->get()
+                ->keyBy('id');
+            $subtotalAmount = 0.0;
+
+            $order = Order::create([
+                'user_id' => $user->id,
+                'subtotal_amount' => 0,
+                'shipping_fee' => $shippingFee,
+                'total_amount' => 0,
+                'shipping_address' => $request->shipping_address,
+                'shipping_city' => $request->shipping_city,
+                'customer_name' => $customerName,
+                'customer_email' => $customerEmail,
+                'customer_phone' => $customerPhone,
+                'payment_method' => $paymentMethod,
+                'payment_reference' => $paymentReference,
+                'status' => 'pending'
+            ]);
+
+            foreach ($itemsPayload as $item) {
+                $product = $products->get($item['product_id']);
+                if (!$product) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Product {$item['product_id']} could not be found."],
+                    ]);
+                }
+
+                $requestedQty = (int) $item['quantity'];
+                if ($product->stock < $requestedQty) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for {$product->title}."],
+                    ]);
+                }
+
+                $product->stock = $product->stock - $requestedQty;
+                $product->save();
+
+                $unitPrice = round((float) $product->price, 2);
+                $subtotalAmount += $unitPrice * $requestedQty;
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $requestedQty,
+                    'price' => $unitPrice,
+                ]);
+            }
+
+            $order->subtotal_amount = round($subtotalAmount, 2);
+            $order->total_amount = round($subtotalAmount + $shippingFee, 2);
+            $order->save();
+
+            DB::commit();
+
+            $order->load(['items.product', 'user']);
+
+            return response()->json([
+                'message' => 'Order placed successfully',
+                'order' => $this->formatOrderResponse($order)
+            ], 201);
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Order failed', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    protected function formatOrderResponse(Order $order): array
+    {
+        $customerName = $order->customer_name ?: ($order->user ? $order->user->name : null);
+        $customerEmail = $order->customer_email ?: ($order->user ? $order->user->email : null);
+        $customerPhone = $order->customer_phone;
+        $paymentMethod = $order->payment_method;
+        $normalizedStatus = strtolower((string) $order->status);
+
+        $items = $order->items->map(function ($item) {
+            $product = $item->product;
+            return [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'price' => $item->price,
+                'name' => $product ? ($product->title ?? $product->name) : ($item->product_name ?? 'Item'),
+                'image' => $product ? $product->image : ($item->product_image ?? null),
+                'image_url' => $product ? $product->image_url : null,
+                'total_price' => $item->price * $item->quantity,
+            ];
+        });
+
+        return [
+            'id' => $order->id,
+            'status' => $normalizedStatus,
+            'subtotal_amount' => (float) ($order->subtotal_amount ?? $order->total_amount),
+            'shipping_fee' => (float) ($order->shipping_fee ?? 0),
+            'total' => (float) $order->total_amount,
+            'total_amount' => (float) $order->total_amount,
+            'shipping_address' => $order->shipping_address,
+            'shipping_city' => $order->shipping_city,
+            'payment_method' => $paymentMethod,
+            'payment_reference' => $order->payment_reference,
+            'created_at' => optional($order->created_at)->toISOString(),
+            'updated_at' => optional($order->updated_at)->toISOString(),
+            'customer' => [
+                'fullName' => $customerName,
+                'name' => $customerName,
+                'email' => $customerEmail,
+                'phone' => $customerPhone,
+                'paymentMethod' => $paymentMethod,
+                'address' => $order->shipping_address,
+                'city' => $order->shipping_city,
+            ],
+            'items' => $items,
+            'order_items' => $items,
+            'item_count' => $items->sum('quantity'),
+        ];
+    }
+
+    protected function isInventoryRestored(?string $status): bool
+    {
+        return in_array(strtolower((string) $status), ['cancelled', 'refunded'], true);
+    }
+
+    protected function restoreInventoryForOrder(Order $order): void
+    {
+        $order->loadMissing('items.product');
+
+        foreach ($order->items as $item) {
+            if ($item->product) {
+                $item->product->increment('stock', $item->quantity);
+            }
+        }
+    }
+
+    protected function reserveInventoryForOrder(Order $order): void
+    {
+        $order->loadMissing('items.product');
+
+        foreach ($order->items as $item) {
+            $product = $item->product;
+
+            if (!$product) {
+                continue;
+            }
+
+            if ($product->stock < $item->quantity) {
+                throw ValidationException::withMessages([
+                    'status' => ["Unable to move order #{$order->id} back to an active state because {$product->title} does not have enough stock."],
+                ]);
+            }
+
+            $product->decrement('stock', $item->quantity);
+        }
+    }
+}
