@@ -212,6 +212,22 @@ export const updateOrderStatus = async (id, status) => {
 
 export const getAdminDashboard = async () => apiRequest('/admin/dashboard');
 
+export const fetchMerchantOrders = async (params = {}) => {
+    return apiRequest(`/merchant/orders${buildQueryString(params)}`);
+};
+
+export const updateMerchantOrderStatus = async (id, status) => {
+    try {
+        return await apiRequest(`/merchant/orders/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        });
+    } catch (error) {
+        console.error('Update merchant order status error:', error);
+        throw error;
+    }
+};
+
 // Admin user management
 export const fetchAdminUsers = async (params = {}) => {
     return apiRequest(`/admin/users${buildQueryString(params)}`);
@@ -257,8 +273,10 @@ export const createProduct = async (productData) => {
         Object.keys(productData).forEach(key => {
             if (key === 'image' && productData[key] instanceof File) {
                 formData.append('image', productData[key]);
-            } else {
+            } else if (productData[key] !== null && productData[key] !== undefined) {
                 formData.append(key, productData[key]);
+            } else {
+                // Skip nullish values so optional fields are not sent as "undefined".
             }
         });
         return await apiRequest('/products', {
@@ -305,7 +323,318 @@ export const deleteProduct = async (id) => {
  * Get product categories
  * @returns {Promise<Array>} Array of categories
  */
-export const getCategories = async () => {
-    const data = await apiRequest('/categories');
+export const getCategories = async (params = {}) => {
+    const data = await apiRequest(`/categories${buildQueryString(params)}`);
     return data?.categories || [];
+};
+
+export const createCategory = async (payload) => {
+    try {
+        return await apiRequest('/categories', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Create category error:', error);
+        throw error;
+    }
+};
+
+// Admin store + merchant management
+export const fetchAdminStores = async () => {
+    return apiRequest('/admin/stores');
+};
+
+export const createAdminStore = async (payload) => {
+    try {
+        const formData = new FormData();
+        Object.keys(payload || {}).forEach((key) => {
+            const value = payload[key];
+            if (value === null || value === undefined) return;
+            if (value instanceof File) {
+                formData.append(key, value);
+                return;
+            }
+            formData.append(key, value);
+        });
+
+        return await apiRequest('/admin/stores', {
+            method: 'POST',
+            body: formData,
+        });
+    } catch (error) {
+        console.error('Create admin store error:', error);
+        throw error;
+    }
+};
+
+export const updateAdminStore = async (storeId, payload) => {
+    try {
+        const formData = new FormData();
+        Object.keys(payload || {}).forEach((key) => {
+            const value = payload[key];
+            if (value === null || value === undefined) return;
+            if (value instanceof File) {
+                formData.append(key, value);
+                return;
+            }
+            formData.append(key, value);
+        });
+        formData.append('_method', 'PUT');
+
+        return await apiRequest(`/admin/stores/${storeId}`, {
+            method: 'POST',
+            body: formData,
+        });
+    } catch (error) {
+        console.error('Update admin store error:', error);
+        throw error;
+    }
+};
+
+export const deactivateAdminStore = async (storeId) => {
+    try {
+        return await apiRequest(`/admin/stores/${storeId}`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        console.error('Deactivate admin store error:', error);
+        throw error;
+    }
+};
+
+export const createStoreMerchant = async (storeId, payload) => {
+    try {
+        return await apiRequest(`/admin/stores/${storeId}/merchants`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Create store merchant error:', error);
+        throw error;
+    }
+};
+
+export const updateAdminMerchant = async (userId, payload) => {
+    try {
+        return await apiRequest(`/admin/merchants/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Update admin merchant error:', error);
+        throw error;
+    }
+};
+
+// Merchant portal APIs
+export const fetchMerchantStore = async () => {
+    return apiRequest('/merchant/store');
+};
+
+export const updateMerchantStore = async (payload) => {
+    try {
+        const formData = new FormData();
+        Object.keys(payload || {}).forEach((key) => {
+            const value = payload[key];
+            if (value === null || value === undefined) return;
+            if (value instanceof File) {
+                formData.append(key, value);
+                return;
+            }
+            formData.append(key, value);
+        });
+        formData.append('_method', 'PUT');
+
+        return await apiRequest('/merchant/store', {
+            method: 'POST',
+            body: formData,
+        });
+    } catch (error) {
+        console.error('Update merchant store error:', error);
+        throw error;
+    }
+};
+
+export const fetchMerchantProducts = async (params = {}) => {
+    return apiRequest(`/merchant/products${buildQueryString(params)}`);
+};
+
+export const createMerchantProduct = async (productData) => {
+    try {
+        const formData = new FormData();
+        Object.keys(productData).forEach(key => {
+            if (key === 'image' && productData[key] instanceof File) {
+                formData.append('image', productData[key]);
+            } else if (productData[key] !== null && productData[key] !== undefined) {
+                formData.append(key, productData[key]);
+            }
+        });
+        return await apiRequest('/merchant/products', {
+            method: 'POST',
+            body: formData,
+        });
+    } catch (error) {
+        console.error('Create merchant product error:', error);
+        throw error;
+    }
+};
+
+export const updateMerchantProduct = async (id, productData) => {
+    try {
+        const formData = new FormData();
+        Object.keys(productData).forEach(key => {
+            if (key === 'image' && productData[key] instanceof File) {
+                formData.append('image', productData[key]);
+            } else if (productData[key] !== null && productData[key] !== undefined) {
+                formData.append(key, productData[key]);
+            }
+        });
+        formData.append('_method', 'PUT');
+        return await apiRequest(`/merchant/products/${id}`, {
+            method: 'POST',
+            body: formData,
+        });
+    } catch (error) {
+        console.error('Update merchant product error:', error);
+        throw error;
+    }
+};
+
+export const deleteMerchantProduct = async (id) => {
+    try {
+        return await apiRequest(`/merchant/products/${id}`, { method: 'DELETE' });
+    } catch (error) {
+        console.error('Delete merchant product error:', error);
+        throw error;
+    }
+};
+
+export const fetchMerchantCategories = async () => {
+    const data = await apiRequest('/merchant/categories');
+    return data?.categories || [];
+};
+
+export const createMerchantCategory = async (payload) => {
+    try {
+        return await apiRequest('/merchant/categories', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Create merchant category error:', error);
+        throw error;
+    }
+};
+
+// Public store browsing + inquiry APIs
+export const fetchStores = async (params = {}) => {
+    return apiRequest(`/stores${buildQueryString(params)}`);
+};
+
+export const fetchStoreBySlug = async (slug) => {
+    const data = await apiRequest(`/stores/${slug}`);
+    return data?.store || null;
+};
+
+export const submitStoreInquiry = async (slug, payload) => {
+    try {
+        return await apiRequest(`/stores/${slug}/inquiries`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Submit store inquiry error:', error);
+        throw error;
+    }
+};
+
+// Product review APIs
+export const fetchProductReviews = async (productId, params = {}) => {
+    return apiRequest(`/products/${productId}/reviews${buildQueryString(params)}`);
+};
+
+export const fetchMyProductReview = async (productId) => {
+    return apiRequest(`/products/${productId}/reviews/me`);
+};
+
+export const upsertProductReview = async (productId, payload) => {
+    try {
+        return await apiRequest(`/products/${productId}/reviews`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Upsert product review error:', error);
+        throw error;
+    }
+};
+
+export const deleteMyProductReview = async (productId) => {
+    try {
+        return await apiRequest(`/products/${productId}/reviews/me`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        console.error('Delete product review error:', error);
+        throw error;
+    }
+};
+
+export const reportProductReview = async (reviewId, payload) => {
+    try {
+        return await apiRequest(`/reviews/${reviewId}/report`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Report product review error:', error);
+        throw error;
+    }
+};
+
+// Admin review moderation APIs
+export const fetchAdminReviews = async (params = {}) => {
+    return apiRequest(`/admin/reviews${buildQueryString(params)}`);
+};
+
+export const updateAdminReviewVisibility = async (reviewId, payload) => {
+    try {
+        return await apiRequest(`/admin/reviews/${reviewId}/visibility`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Update admin review visibility error:', error);
+        throw error;
+    }
+};
+
+export const updateAdminReviewReportStatus = async (reportId, status) => {
+    try {
+        return await apiRequest(`/admin/review-reports/${reportId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        });
+    } catch (error) {
+        console.error('Update admin review report status error:', error);
+        throw error;
+    }
+};
+
+// Merchant inquiry inbox APIs
+export const fetchMerchantInquiries = async (params = {}) => {
+    return apiRequest(`/merchant/inquiries${buildQueryString(params)}`);
+};
+
+export const updateMerchantInquiryStatus = async (id, status) => {
+    try {
+        return await apiRequest(`/merchant/inquiries/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        });
+    } catch (error) {
+        console.error('Update merchant inquiry status error:', error);
+        throw error;
+    }
 };

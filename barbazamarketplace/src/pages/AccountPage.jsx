@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { LockKeyhole, PackageSearch, Search, ShieldCheck } from 'lucide-react';
+import {
+  CircleCheck,
+  CircleX,
+  Clock3,
+  LockKeyhole,
+  Package,
+  PackageSearch,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Truck,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,6 +23,47 @@ import { getUserOrders, updateUserPassword } from '../api/EcommerceApi';
 import { formatPeso } from '../lib/marketplace';
 
 const ORDER_STATUS_FLOW = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+const ORDER_JOURNEY_STEPS = ['pending', 'processing', 'shipped', 'delivered'];
+const TERMINAL_STATUSES = ['cancelled', 'refunded'];
+
+const STATUS_META = {
+  pending: {
+    label: 'Pending',
+    subtitle: 'Order received',
+    detail: 'Your order is in queue and waiting to be prepared.',
+    icon: Clock3,
+  },
+  processing: {
+    label: 'Processing',
+    subtitle: 'Packing items',
+    detail: 'The seller is preparing and packing your order.',
+    icon: Package,
+  },
+  shipped: {
+    label: 'Shipped',
+    subtitle: 'On the way',
+    detail: 'Your parcel has been dispatched and is on the way.',
+    icon: Truck,
+  },
+  delivered: {
+    label: 'Delivered',
+    subtitle: 'Completed',
+    detail: 'Your order has been delivered successfully.',
+    icon: CircleCheck,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    subtitle: 'Order closed',
+    detail: 'This order was cancelled and will not be delivered.',
+    icon: CircleX,
+  },
+  refunded: {
+    label: 'Refunded',
+    subtitle: 'Order closed',
+    detail: 'This order has been refunded to your payment source.',
+    icon: RotateCcw,
+  },
+};
 
 const toStatusLabel = (status) => {
   const value = String(status || 'pending');
@@ -33,6 +85,62 @@ const statusVariantClass = (status) => {
     default:
       return 'bg-slate-100 text-slate-700';
   }
+};
+
+const getStepState = (currentStatus, stepIndex) => {
+  const normalizedStatus = String(currentStatus || 'pending').toLowerCase();
+  if (TERMINAL_STATUSES.includes(normalizedStatus)) return 'upcoming';
+
+  const currentIndex = ORDER_JOURNEY_STEPS.indexOf(normalizedStatus);
+  if (currentIndex === -1) return stepIndex === 0 ? 'current' : 'upcoming';
+  if (stepIndex < currentIndex) return 'complete';
+  if (stepIndex === currentIndex) return 'current';
+  return 'upcoming';
+};
+
+const getJourneyProgressPercent = (status) => {
+  const normalizedStatus = String(status || 'pending').toLowerCase();
+  if (TERMINAL_STATUSES.includes(normalizedStatus)) return 100;
+
+  const currentIndex = ORDER_JOURNEY_STEPS.indexOf(normalizedStatus);
+  if (currentIndex === -1) return 25;
+
+  return ((currentIndex + 1) / ORDER_JOURNEY_STEPS.length) * 100;
+};
+
+const formatDateTime = (value) => {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString();
+};
+
+const getOrderItems = (order) => (Array.isArray(order?.items) ? order.items : []);
+
+const getOrderPrimaryItem = (order) => getOrderItems(order)[0] || null;
+
+const getOrderStores = (order) => (
+  [...new Set(
+    getOrderItems(order)
+      .map((item) => item?.store_name || (item?.store_id ? `Store #${item.store_id}` : null))
+      .filter(Boolean)
+  )]
+);
+
+const getOrderStoreSummary = (order) => {
+  const stores = getOrderStores(order);
+  if (stores.length === 0) return 'Store not available';
+  if (stores.length === 1) return stores[0];
+  return `${stores[0]} +${stores.length - 1} more store${stores.length > 2 ? 's' : ''}`;
+};
+
+const getOrderItemSummary = (order) => {
+  const items = getOrderItems(order);
+  if (items.length === 0) return 'No items';
+
+  const firstItemName = items[0]?.name || 'Item';
+  const remainingCount = items.length - 1;
+  if (remainingCount <= 0) return firstItemName;
+  return `${firstItemName} +${remainingCount} more item${remainingCount > 1 ? 's' : ''}`;
 };
 
 const AccountPage = () => {
@@ -83,8 +191,13 @@ const AccountPage = () => {
         order.id,
         order.status,
         order.payment_method,
+        order.payment_reference,
         order.total_amount,
         order.shipping_address,
+        order.shipping_city,
+        order.customer?.fullName,
+        order.customer?.email,
+        ...getOrderItems(order).flatMap((item) => [item?.name, item?.store_name, item?.store_slug]),
       ]
         .filter(Boolean)
         .join(' ')
@@ -97,6 +210,9 @@ const AccountPage = () => {
     () => filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0] || null,
     [filteredOrders, selectedOrderId]
   );
+
+  const selectedOrderItems = useMemo(() => getOrderItems(selectedOrder), [selectedOrder]);
+  const selectedOrderStores = useMemo(() => getOrderStores(selectedOrder), [selectedOrder]);
 
   useEffect(() => {
     if (!selectedOrder && filteredOrders.length > 0) {
@@ -154,33 +270,33 @@ const AccountPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7FD] py-8">
+    <div className="min-h-screen bg-[#F4F7FD] py-6 sm:py-8">
       <Helmet>
         <title>My Account - Barbaza MPC Marketplace</title>
       </Helmet>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[#0B1739]">My Account</h1>
+          <h1 className="text-2xl font-bold text-[#0B1739] sm:text-3xl">My Account</h1>
           <p className="mt-2 text-slate-600">View your orders, track status, and update account security.</p>
         </div>
 
         <Tabs defaultValue="orders" className="space-y-5">
-          <TabsList className="h-11 rounded-2xl bg-white p-1 shadow-sm">
-            <TabsTrigger value="orders" className="rounded-xl px-4 py-2">Orders</TabsTrigger>
-            <TabsTrigger value="security" className="rounded-xl px-4 py-2">Security</TabsTrigger>
+          <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm">
+            <TabsTrigger value="orders" className="rounded-xl px-4 py-2 whitespace-nowrap">Orders</TabsTrigger>
+            <TabsTrigger value="security" className="rounded-xl px-4 py-2 whitespace-nowrap">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders" className="space-y-5">
             <Card className="border-none bg-white/80 shadow-lg">
-              <CardContent className="p-5">
+              <CardContent className="p-4 sm:p-5">
                 <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       value={orderSearch}
                       onChange={(event) => setOrderSearch(event.target.value)}
-                      placeholder="Search by order ID, status, payment, or address"
+                      placeholder="Search by order ID, item, store, payment, or address"
                       className="h-11 rounded-2xl pl-10"
                     />
                   </div>
@@ -201,10 +317,10 @@ const AccountPage = () => {
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
               <Card className="border-none bg-white/80 shadow-lg">
-                <CardHeader>
+                <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                   <CardTitle className="text-xl">Order History</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                   {loadingOrders ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
                       Loading your orders...
@@ -216,84 +332,204 @@ const AccountPage = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {filteredOrders.map((order) => (
-                        <button
-                          key={order.id}
-                          type="button"
-                          onClick={() => setSelectedOrderId(order.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition ${
-                            selectedOrder?.id === order.id
-                              ? 'border-[#2954C8]/30 bg-[#eef5ff]'
-                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">Order #{order.id}</p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {new Date(order.created_at).toLocaleString()}
-                              </p>
+                      {filteredOrders.map((order) => {
+                        const primaryItem = getOrderPrimaryItem(order);
+                        const storeSummary = getOrderStoreSummary(order);
+                        const itemSummary = getOrderItemSummary(order);
+
+                        return (
+                          <button
+                            key={order.id}
+                            type="button"
+                            onClick={() => setSelectedOrderId(order.id)}
+                            className={`w-full rounded-2xl border p-4 text-left transition ${
+                              selectedOrder?.id === order.id
+                                ? 'border-[#2954C8]/30 bg-[#eef5ff]'
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                  {primaryItem?.image_url ? (
+                                    <img
+                                      src={primaryItem.image_url}
+                                      alt={primaryItem?.name || 'Ordered item'}
+                                      className="h-full w-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <Package className="h-5 w-5 text-slate-400" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-slate-800">Order #{order.id}</p>
+                                  <p className="mt-0.5 truncate text-xs font-medium text-slate-700">{itemSummary}</p>
+                                  <p className="mt-0.5 truncate text-xs text-slate-500">{storeSummary}</p>
+                                  <p className="mt-0.5 break-words text-[11px] text-slate-500">{formatDateTime(order.created_at)}</p>
+                                </div>
+                              </div>
+                              <Badge className={`shrink-0 border-none text-[10px] uppercase tracking-wider ${statusVariantClass(order.status)}`}>
+                                {toStatusLabel(order.status)}
+                              </Badge>
                             </div>
-                            <Badge className={`border-none text-[10px] uppercase tracking-wider ${statusVariantClass(order.status)}`}>
-                              {toStatusLabel(order.status)}
-                            </Badge>
-                          </div>
-                          <p className="mt-3 text-sm font-semibold text-[#2954C8]">
-                            {formatPeso(order.total_amount)}
-                          </p>
-                        </button>
-                      ))}
+
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-[#2954C8]">{formatPeso(order.total_amount)}</p>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                                {order.payment_method || 'N/A'}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="border-none bg-white/80 shadow-lg">
-                <CardHeader>
+                <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                   <CardTitle className="text-xl">Order Details</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                   {!selectedOrder ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
                       Select an order to view details.
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between gap-2">
+                      {(() => {
+                        const normalizedStatus = String(selectedOrder.status || 'pending').toLowerCase();
+                        const statusMeta = STATUS_META[normalizedStatus] || STATUS_META.pending;
+                        const StatusIcon = statusMeta.icon;
+                        const isTerminalStatus = TERMINAL_STATUSES.includes(normalizedStatus);
+                        const progress = getJourneyProgressPercent(normalizedStatus);
+
+                        return (
+                          <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-3 sm:p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Order Journey</p>
+                              <div className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusVariantClass(normalizedStatus)}`}>
+                                <StatusIcon className="h-3.5 w-3.5" />
+                                {statusMeta.label}
+                              </div>
+                            </div>
+
+                            <p className="mt-2 text-sm text-slate-600">{statusMeta.detail}</p>
+
+                            <div className="mt-4 h-2 rounded-full bg-slate-200">
+                              <div
+                                className={`h-2 rounded-full transition-all duration-300 ${isTerminalStatus ? 'bg-rose-500' : 'bg-[#2954C8]'}`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-2 min-[520px]:grid-cols-2">
+                              {ORDER_JOURNEY_STEPS.map((step, index) => {
+                                const stepMeta = STATUS_META[step];
+                                const StepIcon = stepMeta.icon;
+                                const stepState = getStepState(normalizedStatus, index);
+
+                                const stateClass =
+                                  stepState === 'complete'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : stepState === 'current'
+                                      ? 'border-[#2954C8]/35 bg-[#eef5ff] text-[#2954C8]'
+                                      : 'border-slate-200 bg-white text-slate-500';
+
+                                return (
+                                  <div key={step} className={`min-w-0 rounded-xl border p-2.5 ${stateClass}`}>
+                                    <div className="flex items-start gap-2">
+                                      <div
+                                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
+                                          stepState === 'complete'
+                                            ? 'bg-emerald-600 text-white'
+                                            : stepState === 'current'
+                                              ? 'bg-[#2954C8] text-white'
+                                              : 'bg-slate-100 text-slate-500'
+                                        }`}
+                                      >
+                                        <StepIcon className="h-4 w-4" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="break-words text-[11px] font-semibold uppercase leading-tight">{stepMeta.label}</p>
+                                        <p className="mt-0.5 break-words text-[11px] leading-tight opacity-80">{stepMeta.subtitle}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {isTerminalStatus && (
+                              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                                This order has reached a closed status: <span className="font-semibold">{statusMeta.label}</span>.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-bold text-slate-800">Order #{selectedOrder.id}</p>
                         <Badge className={`border-none text-[10px] uppercase tracking-wider ${statusVariantClass(selectedOrder.status)}`}>
                           {toStatusLabel(selectedOrder.status)}
                         </Badge>
                       </div>
 
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status Flow</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {ORDER_STATUS_FLOW.map((status) => (
-                            <span
-                              key={status}
-                              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                                status === selectedOrder.status ? 'bg-[#2954C8] text-white' : 'bg-white text-slate-500'
-                              }`}
-                            >
-                              {toStatusLabel(status)}
-                            </span>
-                          ))}
+                      <div className="rounded-2xl border border-slate-200 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Store(s)</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {selectedOrderStores.length > 0 ? (
+                            selectedOrderStores.map((storeName) => (
+                              <span
+                                key={storeName}
+                                className="rounded-full border border-[#d7e2f1] bg-[#f6f9ff] px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                              >
+                                {storeName}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-slate-500">Store not available</span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                         <div>
                           <p className="text-xs text-slate-500">Placed</p>
-                          <p className="mt-1 font-medium text-slate-800">{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{formatDateTime(selectedOrder.created_at)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500">Payment</p>
-                          <p className="mt-1 font-medium text-slate-800">{selectedOrder.payment_method || 'N/A'}</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{selectedOrder.payment_method || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Payment Ref</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{selectedOrder.payment_reference || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Customer</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">
+                            {selectedOrder.customer?.fullName || selectedOrder.customer?.name || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Email</p>
+                          <p className="mt-1 break-all font-medium text-slate-800">{selectedOrder.customer?.email || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Phone</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{selectedOrder.customer?.phone || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500">Shipping City</p>
-                          <p className="mt-1 font-medium text-slate-800">{selectedOrder.shipping_city || 'N/A'}</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{selectedOrder.shipping_city || 'N/A'}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs text-slate-500">Shipping Address</p>
+                          <p className="mt-1 break-words font-medium text-slate-800">{selectedOrder.shipping_address || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500">Total</p>
@@ -303,14 +539,40 @@ const AccountPage = () => {
 
                       <div className="rounded-2xl border border-slate-200 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Items</p>
-                        <div className="mt-3 space-y-2">
-                          {(selectedOrder.items || []).map((item) => (
-                            <div key={item.id} className="flex items-center justify-between text-sm">
-                              <span className="text-slate-700">{item.name} x {item.quantity}</span>
-                              <span className="font-medium text-slate-800">{formatPeso(item.total_price)}</span>
-                            </div>
-                          ))}
-                        </div>
+                        {selectedOrderItems.length === 0 ? (
+                          <p className="mt-3 text-sm text-slate-500">No items available for this order.</p>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {selectedOrderItems.map((item) => (
+                              <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                    {item.image_url ? (
+                                      <img
+                                        src={item.image_url}
+                                        alt={item.name || 'Ordered item'}
+                                        className="h-full w-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <Package className="h-4 w-4 text-slate-400" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-slate-800">{item.name || 'Item'}</p>
+                                    <p className="truncate text-xs text-slate-500">
+                                      {item.store_name || (item.store_id ? `Store #${item.store_id}` : 'Store not available')}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      {formatPeso(item.price)} x {item.quantity}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className="self-end font-semibold text-slate-800 sm:self-auto">{formatPeso(item.total_price)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

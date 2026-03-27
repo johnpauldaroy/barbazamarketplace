@@ -52,6 +52,8 @@ const RegisterPage = () => {
       const data = await register(formData);
       if (data?.user?.is_admin) {
         navigate('/admin', { replace: true });
+      } else if (data?.user?.is_merchant) {
+        navigate('/merchant', { replace: true });
       } else {
         navigate(redirectPath, { replace: true });
       }

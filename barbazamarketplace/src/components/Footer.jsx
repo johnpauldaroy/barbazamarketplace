@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock3, Mail, MapPin, Phone, Store } from 'lucide-react';
+import { Clock3, Mail, MapPin, Phone } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const brandLogoSrc = '/brand-logo-transparent.png';
 
   return (
     <footer className="mt-auto border-t border-white/40 bg-[#0b1739] text-white">
@@ -11,14 +12,18 @@ const Footer = () => {
         <div className="grid gap-10 lg:grid-cols-[1.4fr_0.8fr_1fr]">
           <div className="space-y-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#3D7BF3] text-white shadow-[0_16px_30px_rgba(61,123,243,0.34)]">
-                <Store className="h-5 w-5 stroke-[2.4]" />
+              <div className="flex h-14 w-14 items-center justify-center">
+                <img
+                  src={brandLogoSrc}
+                  alt="e-KoopMart logo"
+                  className="max-h-full max-w-full object-contain"
+                />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">
-                  Barbaza MPC Marketplace
+                  e-KoopMart
                 </p>
-                <p className="text-sm text-white/65">Community marketplace</p>
+                <p className="text-sm text-white/65">Merkado para sa padayon nga pangabuhi</p>
               </div>
             </div>
 
@@ -80,7 +85,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/55 md:flex-row md:items-center md:justify-between">
-          <p>&copy; {currentYear} Barbaza MPC Marketplace. All rights reserved.</p>
+          <p>&copy; {currentYear} e-KoopMart. All rights reserved.</p>
           <p>Serving members and the community through trusted cooperative commerce.</p>
         </div>
       </div>

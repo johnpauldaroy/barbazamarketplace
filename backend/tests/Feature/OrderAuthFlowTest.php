@@ -113,4 +113,57 @@ class OrderAuthFlowTest extends TestCase
         $response->assertJsonCount(1, 'orders');
         $response->assertJsonPath('orders.0.id', $firstOrder->id);
     }
+
+    public function test_customer_cannot_update_order_status_anymore(): void
+    {
+        $customer = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $customer->id,
+            'subtotal_amount' => 100,
+            'shipping_fee' => 20,
+            'total_amount' => 120,
+            'status' => 'pending',
+            'shipping_address' => 'Address A',
+            'shipping_city' => 'City A',
+        ]);
+
+        Sanctum::actingAs($customer);
+
+        $response = $this->patchJson("/api/orders/{$order->id}/status", [
+            'status' => 'processing',
+        ]);
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_admin_can_update_order_status(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $order = Order::create([
+            'user_id' => User::factory()->create()->id,
+            'subtotal_amount' => 100,
+            'shipping_fee' => 20,
+            'total_amount' => 120,
+            'status' => 'pending',
+            'shipping_address' => 'Address A',
+            'shipping_city' => 'City A',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->patchJson("/api/orders/{$order->id}/status", [
+            'status' => 'processing',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('order.status', 'processing');
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'processing',
+        ]);
+    }
 }

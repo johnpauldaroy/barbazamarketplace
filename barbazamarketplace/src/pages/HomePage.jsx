@@ -45,28 +45,31 @@ const VALUE_PILLARS = [
 
 const HERO_SLIDES = [
   {
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=80',
-    statLabel: 'Seasonal goods',
-    statValue: 'Farm-to-community supply',
+    title: 'Local farmer in Barbaza',
+    image: '/assets/images/local_farmer_alt2.jpg',
+    statLabel: 'Local Filipino farmers',
+    statValue: 'Barbaza harvest from field to home',
     accentIcon: Sprout,
-    accentTitle: 'Community produce',
-    accentText: 'Locally grown goods from trusted cooperative suppliers.',
+    accentTitle: 'Community-grown produce',
+    accentText: 'Fresh crops sourced from local cooperative farmers.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1400&q=80',
-    statLabel: 'Handmade products',
-    statValue: 'Crafted by local members',
+    title: 'Farmers during harvest season',
+    image: '/assets/images/vegetables_fruits_harvest.jpg',
+    statLabel: 'Harvest season',
+    statValue: 'Supporting hardworking local growers',
     accentIcon: ShoppingBag,
-    accentTitle: 'Member-made crafts',
-    accentText: 'Handmade products that help create income for Barbaza MPC members.',
+    accentTitle: 'Local farm network',
+    accentText: 'Built around trusted farmers and fair local trade.',
   },
   {
-    image: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=1400&q=80',
-    statLabel: 'Shopping promise',
-    statValue: 'Trusted, local, fair',
+    title: 'Antique local products',
+    image: '/assets/images/antique_handicrafts.jpg',
+    statLabel: 'Handicrafts:',
+    statValue: 'Patadyong apparel and textiles, buri palm vases, and other woven items.',
     accentIcon: ShieldCheck,
-    accentTitle: 'Stronger together',
-    accentText: 'Every order supports members, families, and the wider community.',
+    accentTitle: 'Antique handicraft makers',
+    accentText: 'Handcrafted woven products and textiles from local artisans.',
   },
 ];
 
@@ -122,7 +125,7 @@ const HomePage = () => {
   return (
     <div className="pb-16">
       <Helmet>
-        <title>Barbaza MPC - Cooperative Marketplace</title>
+        <title>e-KoopMart</title>
         <meta
           name="description"
           content="Shop quality products while supporting our cooperative members and strengthening our community."
@@ -289,7 +292,7 @@ const HomePage = () => {
               <Badge variant="secondary">Featured catalog</Badge>
               <h2 className="mt-3 text-3xl font-bold text-[#0b1739]">Popular picks from the cooperative marketplace</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                Freshly surfaced products now use the same premium card language, spacing, and CTAs across the storefront.
+                Discover fresh essentials and local favorites in a cleaner, easier shopping experience.
               </p>
             </div>
             <Link to="/products">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -26,10 +27,10 @@ class OrderController extends Controller
     {
         $user = Auth::user();
         if ($user && $user->is_admin) {
-            $orders = Order::with(['items.product', 'user'])->latest()->get();
+            $orders = Order::with(['items.product.store', 'user'])->latest()->get();
         } else {
             $orders = Order::where('user_id', Auth::id())
-                ->with(['items.product', 'user'])
+                ->with(['items.product.store', 'user'])
                 ->latest()
                 ->get();
         }
@@ -41,7 +42,7 @@ class OrderController extends Controller
 
     public function adminSummary()
     {
-        $orders = Order::with(['items.product', 'user'])->latest()->get();
+        $orders = Order::with(['items.product.store', 'user'])->latest()->get();
         $products = Product::query()->orderBy('title')->get();
         $productSales = OrderItem::query()
             ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(quantity * price) as revenue'))
@@ -157,13 +158,111 @@ class OrderController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        if (!$user->is_admin) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         $request->validate([
             'status' => ['required', 'string', Rule::in(self::STATUS_FLOW)],
         ]);
 
-        $order = Order::with(['items.product', 'user'])->findOrFail($id);
-        if (!$user->is_admin && $order->user_id !== $user->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $order = Order::with(['items.product.store', 'user'])->findOrFail($id);
+        $nextStatus = strtolower((string) $request->status);
+        $previousStatus = strtolower((string) $order->status);
+
+        DB::transaction(function () use ($order, $previousStatus, $nextStatus) {
+            if (!$this->isInventoryRestored($previousStatus) && $this->isInventoryRestored($nextStatus)) {
+                $this->restoreInventoryForOrder($order);
+            }
+
+            if ($this->isInventoryRestored($previousStatus) && !$this->isInventoryRestored($nextStatus)) {
+                $this->reserveInventoryForOrder($order);
+            }
+
+            $order->status = $nextStatus;
+            $order->save();
+        });
+
+        $order->refresh()->load(['items.product.store', 'user']);
+
+        return response()->json([
+            'message' => 'Order status updated',
+            'order' => $this->formatOrderResponse($order)
+        ]);
+    }
+
+    public function merchantIndex(Request $request)
+    {
+        $storeId = (int) $request->user()->store_id;
+        $validated = $request->validate([
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'search' => 'nullable|string|max:255',
+            'status' => ['nullable', 'string', Rule::in(array_merge(['all'], self::STATUS_FLOW))],
+        ]);
+
+        $search = trim((string) ($validated['search'] ?? ''));
+        $status = strtolower((string) ($validated['status'] ?? 'all'));
+        $perPage = (int) ($validated['per_page'] ?? 15);
+
+        $orders = Order::query()
+            ->with(['items.product.store', 'user'])
+            ->whereHas('items.product', fn (Builder $query) => $query->where('store_id', $storeId))
+            ->when($status !== 'all', fn (Builder $query) => $query->where('status', $status))
+            ->when($search !== '', function (Builder $query) use ($search) {
+                $query->where(function (Builder $nestedQuery) use ($search) {
+                    if (is_numeric($search)) {
+                        $nestedQuery->where('id', (int) $search);
+                    }
+
+                    $nestedQuery
+                        ->orWhere('customer_name', 'like', "%{$search}%")
+                        ->orWhere('customer_email', 'like', "%{$search}%")
+                        ->orWhere('customer_phone', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhereHas('user', function (Builder $userQuery) use ($search) {
+                            $userQuery
+                                ->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json([
+            'orders' => $orders->getCollection()
+                ->map(fn (Order $order) => $this->formatMerchantOrderResponse($order, $storeId))
+                ->values(),
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'has_more_pages' => $orders->hasMorePages(),
+            ],
+        ]);
+    }
+
+    public function merchantUpdateStatus(Request $request, int $id)
+    {
+        $storeId = (int) $request->user()->store_id;
+
+        $request->validate([
+            'status' => ['required', 'string', Rule::in(self::STATUS_FLOW)],
+        ]);
+
+        $order = Order::query()
+            ->with(['items.product.store', 'user'])
+            ->whereHas('items.product', fn (Builder $query) => $query->where('store_id', $storeId))
+            ->findOrFail($id);
+
+        $merchantOrderView = $this->buildMerchantOrderView($order, $storeId);
+        if ($merchantOrderView['has_other_store_items']) {
+            return response()->json([
+                'message' => 'Status updates for mixed-store orders are only available to admins.',
+            ], 409);
         }
 
         $nextStatus = strtolower((string) $request->status);
@@ -182,11 +281,11 @@ class OrderController extends Controller
             $order->save();
         });
 
-        $order->refresh()->load(['items.product', 'user']);
+        $order->refresh()->load(['items.product.store', 'user']);
 
         return response()->json([
             'message' => 'Order status updated',
-            'order' => $this->formatOrderResponse($order)
+            'order' => $this->formatMerchantOrderResponse($order, $storeId),
         ]);
     }
 
@@ -295,7 +394,7 @@ class OrderController extends Controller
 
             DB::commit();
 
-            $order->load(['items.product', 'user']);
+            $order->load(['items.product.store', 'user']);
 
             return response()->json([
                 'message' => 'Order placed successfully',
@@ -319,19 +418,7 @@ class OrderController extends Controller
         $paymentMethod = $order->payment_method;
         $normalizedStatus = strtolower((string) $order->status);
 
-        $items = $order->items->map(function ($item) {
-            $product = $item->product;
-            return [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'price' => $item->price,
-                'name' => $product ? ($product->title ?? $product->name) : ($item->product_name ?? 'Item'),
-                'image' => $product ? $product->image : ($item->product_image ?? null),
-                'image_url' => $product ? $product->image_url : null,
-                'total_price' => $item->price * $item->quantity,
-            ];
-        });
+        $items = $order->items->map(fn (OrderItem $item) => $this->formatOrderItem($item));
 
         return [
             'id' => $order->id,
@@ -361,6 +448,60 @@ class OrderController extends Controller
         ];
     }
 
+    protected function formatMerchantOrderResponse(Order $order, int $storeId): array
+    {
+        $orderView = $this->buildMerchantOrderView($order, $storeId);
+
+        return array_merge($this->formatOrderResponse($order), [
+            'store_items' => $orderView['store_items'],
+            'store_subtotal_amount' => $orderView['store_subtotal_amount'],
+            'store_item_count' => $orderView['store_item_count'],
+            'has_other_store_items' => $orderView['has_other_store_items'],
+            'merchant_can_update_status' => !$orderView['has_other_store_items'],
+        ]);
+    }
+
+    protected function buildMerchantOrderView(Order $order, int $storeId): array
+    {
+        $storeItems = $order->items
+            ->filter(fn (OrderItem $item) => (int) optional($item->product)->store_id === $storeId)
+            ->values()
+            ->map(fn (OrderItem $item) => $this->formatOrderItem($item))
+            ->values();
+
+        $hasOtherStoreItems = $order->items->contains(
+            fn (OrderItem $item) => (int) optional($item->product)->store_id !== $storeId
+        );
+
+        return [
+            'store_items' => $storeItems,
+            'store_subtotal_amount' => round((float) $storeItems->sum('total_price'), 2),
+            'store_item_count' => (int) $storeItems->sum('quantity'),
+            'has_other_store_items' => $hasOtherStoreItems,
+        ];
+    }
+
+    protected function formatOrderItem(OrderItem $item): array
+    {
+        $product = $item->product;
+        $store = $product ? $product->store : null;
+        $lineTotal = round((float) $item->price * (int) $item->quantity, 2);
+
+        return [
+            'id' => $item->id,
+            'product_id' => $item->product_id,
+            'store_id' => (int) ($product->store_id ?? 0),
+            'store_name' => $store ? $store->name : null,
+            'store_slug' => $store ? $store->slug : null,
+            'quantity' => (int) $item->quantity,
+            'price' => (float) $item->price,
+            'name' => $product ? ($product->title ?? $product->name) : 'Item',
+            'image' => $product ? $product->image : null,
+            'image_url' => $product ? $product->image_url : null,
+            'total_price' => $lineTotal,
+        ];
+    }
+
     protected function isInventoryRestored(?string $status): bool
     {
         return in_array(strtolower((string) $status), ['cancelled', 'refunded'], true);
@@ -368,7 +509,7 @@ class OrderController extends Controller
 
     protected function restoreInventoryForOrder(Order $order): void
     {
-        $order->loadMissing('items.product');
+        $order->loadMissing('items.product.store');
 
         foreach ($order->items as $item) {
             if ($item->product) {
@@ -379,7 +520,7 @@ class OrderController extends Controller
 
     protected function reserveInventoryForOrder(Order $order): void
     {
-        $order->loadMissing('items.product');
+        $order->loadMissing('items.product.store');
 
         foreach ($order->items as $item) {
             $product = $item->product;

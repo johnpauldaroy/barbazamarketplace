@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { CreditCard, Smartphone, ArrowLeft } from 'lucide-react';
+import { CreditCard, Smartphone, ArrowLeft, Store } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -30,7 +30,7 @@ const CheckoutPage = () => {
   const subtotalInCents = useMemo(() => {
     return cartItems.reduce((sum, item) => sum + (getItemPriceInCents(item) * item.quantity), 0);
   }, [cartItems]);
-  const shippingFeeInCents = cartItems.length > 0 ? 5000 : 0;
+  const shippingFeeInCents = cartItems.length > 0 && formData.paymentMethod !== 'pickup' ? 5000 : 0;
   const totalInCents = subtotalInCents + shippingFeeInCents;
   const formatPeso = (amountInCents) => `PHP ${(amountInCents / 100).toFixed(2)}`;
 
@@ -52,7 +52,6 @@ const CheckoutPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!formData.fullName || !formData.email || !formData.phone || !formData.address || !formData.city) {
       toast({
         title: 'Missing Information',
@@ -113,7 +112,7 @@ const CheckoutPage = () => {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
-        paymentMethod: formData.paymentMethod
+        paymentMethod: formData.paymentMethod,
       },
     };
 
@@ -177,15 +176,15 @@ const CheckoutPage = () => {
           <ArrowLeft className="mr-2 w-4 h-4" /> Back to Cart
         </Button>
 
-        <h1 className="text-3xl md:text-4xl font-bold text-[#0B1739] mb-8">Checkout</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#0B1739] mb-8">Checkout</h1>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
             <div className="lg:col-span-2 space-y-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-md p-6"
+                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
               >
                 <h2 className="text-xl font-bold text-[#0B1739] mb-6">Contact Information</h2>
                 <div className="space-y-4">
@@ -234,7 +233,7 @@ const CheckoutPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white rounded-xl shadow-md p-6"
+                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
               >
                 <h2 className="text-xl font-bold text-[#0B1739] mb-6">Shipping Address</h2>
                 <div className="space-y-4">
@@ -269,33 +268,64 @@ const CheckoutPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white rounded-xl shadow-md p-6"
+                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
               >
                 <h2 className="text-xl font-bold text-[#0B1739] mb-6">Payment Method</h2>
                 <div className="space-y-3">
-                  <label className="flex flex-col sm:flex-row sm:items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-[#12B981] transition-colors">
+                  <label
+                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      formData.paymentMethod === 'qrph'
+                        ? 'border-[#12B981] bg-emerald-50/40'
+                        : 'border-gray-200 hover:border-[#12B981]'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name="paymentMethod"
                       value="qrph"
                       checked={formData.paymentMethod === 'qrph'}
                       onChange={handleInputChange}
-                      className="w-5 h-5 text-[#12B981]"
+                      className="w-5 h-5 text-[#12B981] shrink-0"
                     />
-                    <Smartphone className="w-6 h-6 ml-3 text-[#12B981]" />
-                    <span className="ml-3 font-medium text-[#0B1739]">QRPH Scan to Pay</span>
+                    <Smartphone className="w-5 h-5 text-[#12B981] shrink-0" />
+                    <span className="font-medium text-[#0B1739]">QRPH Scan to Pay</span>
                   </label>
-                  <label className="flex flex-col sm:flex-row sm:items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-[#12B981] transition-colors">
+                  <label
+                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      formData.paymentMethod === 'cod'
+                        ? 'border-[#12B981] bg-emerald-50/40'
+                        : 'border-gray-200 hover:border-[#12B981]'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name="paymentMethod"
                       value="cod"
                       checked={formData.paymentMethod === 'cod'}
                       onChange={handleInputChange}
-                      className="w-5 h-5 text-[#12B981]"
+                      className="w-5 h-5 text-[#12B981] shrink-0"
                     />
-                    <CreditCard className="w-6 h-6 ml-3 text-[#12B981]" />
-                    <span className="ml-3 font-medium text-[#0B1739]">Cash on Delivery</span>
+                    <CreditCard className="w-5 h-5 text-[#12B981] shrink-0" />
+                    <span className="font-medium text-[#0B1739]">Cash on Delivery</span>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      formData.paymentMethod === 'pickup'
+                        ? 'border-[#12B981] bg-emerald-50/40'
+                        : 'border-gray-200 hover:border-[#12B981]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="pickup"
+                      checked={formData.paymentMethod === 'pickup'}
+                      onChange={handleInputChange}
+                      className="w-5 h-5 text-[#12B981] shrink-0"
+                    />
+                    <Store className="w-5 h-5 text-[#12B981] shrink-0" />
+                    <span className="font-medium text-[#0B1739]">Pick up</span>
                   </label>
                 </div>
 
@@ -333,17 +363,17 @@ const CheckoutPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="bg-white rounded-xl shadow-md p-6 lg:sticky lg:top-24"
+                className="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:sticky lg:top-24"
               >
                 <h2 className="text-xl font-bold text-[#0B1739] mb-6">Order Summary</h2>
 
                 <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
                   {cartItems.map((item) => (
-                    <div key={item.variant.id} className="flex justify-between text-sm">
-                      <span className="text-gray-600">
+                    <div key={item.variant.id} className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-gray-600 min-w-0 break-words">
                         {item.product.title} x {item.quantity}
                       </span>
-                      <span className="font-semibold">{formatPeso(getItemPriceInCents(item) * item.quantity)}</span>
+                      <span className="font-semibold shrink-0">{formatPeso(getItemPriceInCents(item) * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
@@ -368,7 +398,7 @@ const CheckoutPage = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full mt-6 bg-[#2EA7FF] hover:bg-[#2197E9] text-[#2954C8] font-semibold py-6 text-lg"
+                  className="w-full mt-6 bg-[#2EA7FF] hover:bg-[#2197E9] text-white font-semibold py-6 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Placing Order...' : 'Place Order'}
                 </Button>

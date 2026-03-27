@@ -23,6 +23,8 @@ class User extends Authenticatable
         'email',
         'password',
         'is_admin',
+        'is_merchant',
+        'store_id',
     ];
 
     /**
@@ -46,6 +48,22 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_merchant' => 'boolean',
         ];
+    }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    public function productReviews()
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function productReviewReports()
+    {
+        return $this->hasMany(ProductReviewReport::class, 'reporter_user_id');
     }
 }

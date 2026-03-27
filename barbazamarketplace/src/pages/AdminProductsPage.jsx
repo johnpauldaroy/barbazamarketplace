@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -8,10 +8,11 @@ import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
-import { createProduct, deleteProduct, fetchProducts, updateProduct } from '../api/EcommerceApi';
+import { createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
 
 const INITIAL_FORM = {
+  storeId: '',
   title: '',
   category: '',
   price: '',
@@ -30,6 +31,7 @@ const normalizeProduct = (product) => ({
 });
 
 const AdminProductsPage = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const outletContext = useOutletContext() || {};
   const {
@@ -40,6 +42,9 @@ const AdminProductsPage = () => {
   } = outletContext;
 
   const [products, setProducts] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -56,7 +61,12 @@ const AdminProductsPage = () => {
       const allProducts = [];
 
       while (hasMore) {
-        const response = await fetchProducts({ page, per_page: 24, sort: 'name' });
+        const response = await fetchProducts({
+          page,
+          per_page: 24,
+          sort: 'name',
+          store_id: selectedStoreId || undefined,
+        });
         const pageProducts = Array.isArray(response?.products) ? response.products : [];
         allProducts.push(...pageProducts);
 
@@ -74,22 +84,52 @@ const AdminProductsPage = () => {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [toast]);
+  }, [selectedStoreId, toast]);
 
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
+  const loadStores = useCallback(async () => {
+    try {
+      const response = await fetchAdminStores();
+      setStores(Array.isArray(response?.stores) ? response.stores : []);
+    } catch (_) {
+      setStores([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStores();
+  }, [loadStores]);
+
+  const loadCategoryOptions = useCallback(async (storeId = '') => {
+    try {
+      const categories = await getCategories({ store_id: storeId || undefined });
+      setCategoryOptions(Array.isArray(categories) ? categories : []);
+    } catch (error) {
+      // Keep product management usable even if category suggestions fail to load.
+      setCategoryOptions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategoryOptions(selectedStoreId);
+  }, [loadCategoryOptions, selectedStoreId]);
+
+  useEffect(() => {
+    if (!isFormDialogOpen) return;
+    loadCategoryOptions(form.storeId || selectedStoreId);
+  }, [form.storeId, isFormDialogOpen, loadCategoryOptions, selectedStoreId]);
+
   const categories = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          products
-            .map((product) => product?.category)
-            .filter(Boolean)
-        )
-      ).sort((left, right) => left.localeCompare(right)),
-    [products]
+    () => {
+      const fromProducts = products.map((product) => product?.category).filter(Boolean);
+      return Array.from(new Set([...categoryOptions, ...fromProducts])).sort((left, right) =>
+        left.localeCompare(right)
+      );
+    },
+    [products, categoryOptions]
   );
 
   const normalizedProducts = useMemo(
@@ -114,13 +154,14 @@ const AdminProductsPage = () => {
 
   const openAddDialog = () => {
     setEditingProduct(null);
-    setForm(INITIAL_FORM);
+    setForm({ ...INITIAL_FORM, storeId: selectedStoreId });
     setIsFormDialogOpen(true);
   };
 
   const openEditDialog = (product) => {
     setEditingProduct(product);
     setForm({
+      storeId: product?.store_id != null ? String(product.store_id) : selectedStoreId,
       title: product?.title || product?.name || '',
       category: product?.category || '',
       price: product?.price != null ? String(product.price) : '',
@@ -146,6 +187,7 @@ const AdminProductsPage = () => {
     const title = form.title.trim();
     const category = form.category.trim();
     const description = form.description.trim();
+    const parsedStoreId = form.storeId ? Number(form.storeId) : null;
     const parsedPrice = Number(form.price);
     const parsedStock = Number(form.stock);
 
@@ -170,6 +212,7 @@ const AdminProductsPage = () => {
     const payload = {
       title,
       category,
+      store_id: parsedStoreId || undefined,
       price: parsedPrice,
       stock: Math.floor(parsedStock),
       description,
@@ -193,8 +236,9 @@ const AdminProductsPage = () => {
         toast({ title: 'Product added', description: `${created.displayName} has been created.`, variant: 'success' });
       }
 
+      loadCategoryOptions(form.storeId);
       setIsFormDialogOpen(false);
-      setForm(INITIAL_FORM);
+      setForm({ ...INITIAL_FORM, storeId: selectedStoreId });
       setEditingProduct(null);
     } catch (error) {
       toast({
@@ -215,6 +259,7 @@ const AdminProductsPage = () => {
       await deleteProduct(deletingProduct.id);
       setProducts((prev) => prev.filter((item) => item.id !== deletingProduct.id));
       toast({ title: 'Product deleted', description: `${deletingProduct.displayName} has been removed.`, variant: 'success' });
+      loadCategoryOptions(selectedStoreId);
       setIsDeleteDialogOpen(false);
       setDeletingProduct(null);
     } catch (error) {
@@ -242,7 +287,7 @@ const AdminProductsPage = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex gap-4">
+          <div className="mb-6 flex flex-wrap gap-4">
             <div className="relative flex-1 min-w-[300px]">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -252,6 +297,20 @@ const AdminProductsPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <div className="min-w-[220px]">
+              <select
+                value={selectedStoreId}
+                onChange={(event) => setSelectedStoreId(event.target.value)}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20"
+              >
+                <option value="">All stores</option>
+                {stores.map((store) => (
+                  <option key={store.id} value={String(store.id)}>
+                    {store.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm">
@@ -259,6 +318,7 @@ const AdminProductsPage = () => {
               <thead>
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Product</th>
+                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Store</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Category</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Price</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Stock</th>
@@ -267,10 +327,10 @@ const AdminProductsPage = () => {
               </thead>
               <tbody className="divide-y divide-[#ECF1FA]">
                 {tableLoading ? (
-                   <tr><td colSpan="5" className="py-10 text-center text-slate-400 animate-pulse">Loading catalog...</td></tr>
+                   <tr><td colSpan="6" className="py-10 text-center text-slate-400 animate-pulse">Loading catalog...</td></tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-20 text-center text-slate-500">
+                    <td colSpan="6" className="py-20 text-center text-slate-500">
                       No products found.
                     </td>
                   </tr>
@@ -291,6 +351,9 @@ const AdminProductsPage = () => {
                             <p className="text-[10px] text-slate-400">ID: {product.id}</p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-semibold text-slate-700">{product?.store?.name || 'Platform Store'}</p>
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 border-slate-200">
@@ -364,35 +427,67 @@ const AdminProductsPage = () => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="product-category">Category</Label>
-                <Input
-                  id="product-category"
-                  list="product-categories"
-                  value={form.category}
-                  onChange={(event) => updateFormField('category', event.target.value)}
-                  placeholder="e.g. Fruits"
-                  required
-                />
-                <datalist id="product-categories">
-                  {categories.map((category) => (
-                    <option key={category} value={category} />
+                <Label htmlFor="product-store">Store</Label>
+                <select
+                  id="product-store"
+                  value={form.storeId}
+                  onChange={(event) => {
+                    updateFormField('storeId', event.target.value);
+                    updateFormField('category', '');
+                  }}
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20"
+                >
+                  <option value="">Platform Store (Default)</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={String(store.id)}>
+                      {store.name}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="product-stock">Stock</Label>
-                <Input
-                  id="product-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.stock}
-                  onChange={(event) => updateFormField('stock', event.target.value)}
-                  placeholder="0"
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="product-category">Category</Label>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/settings')}
+                    className="text-xs font-semibold text-[#2954C8] hover:underline"
+                  >
+                    Manage in Settings
+                  </button>
+                </div>
+                <select
+                  id="product-category"
+                  value={form.category}
+                  onChange={(event) => updateFormField('category', event.target.value)}
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20 disabled:cursor-not-allowed disabled:opacity-50"
                   required
-                />
+                >
+                  <option value="" disabled>
+                    {categories.length > 0 ? 'Select a category' : 'No categories available'}
+                  </option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="product-stock">Stock</Label>
+              <Input
+                id="product-stock"
+                type="number"
+                min="0"
+                step="1"
+                value={form.stock}
+                onChange={(event) => updateFormField('stock', event.target.value)}
+                placeholder="0"
+                required
+              />
             </div>
 
             <div className="space-y-2">

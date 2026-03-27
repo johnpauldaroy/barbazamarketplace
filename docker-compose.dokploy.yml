@@ -1,0 +1,50 @@
+services:
+  frontend:
+    build:
+      context: ./barbazamarketplace
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://ekoopmart.barbazampc.cloud
+      APP_KEY: ${APP_KEY}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: info
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      FILESYSTEM_DISK: public
+    volumes:
+      - backend_storage:/var/www/html/storage
+      - backend_database:/var/www/html/database
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php -r \"exit(@file_get_contents('http://127.0.0.1:8000/up') === false ? 1 : 0);\"",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  backend_storage:
+  backend_database:

@@ -11,6 +11,9 @@ const ProductCard = ({ product, onAddToCart }) => {
   const title = product.title || product.name || 'Untitled product';
   const price = Number(product.price || 0);
   const stock = Number(product.stock || 0);
+  const averageRating = Number(product?.review_summary?.average_rating || 0);
+  const ratingsCount = Number(product?.review_summary?.ratings_count || 0);
+  const roundedAverage = Math.round(averageRating);
   const imageUrl = resolveProductImage(product.image);
   const isLowStock = stock > 0 && stock < 20;
   const isOutOfStock = stock <= 0;
@@ -60,6 +63,18 @@ const ProductCard = ({ product, onAddToCart }) => {
               {title}
             </h3>
           </Link>
+          {product?.store?.slug ? (
+            <Link
+              to={`/stores/${product.store.slug}`}
+              className="mt-1 inline-block text-xs font-medium text-slate-500 hover:text-[#2954C8]"
+            >
+              {product?.store?.name || 'Platform Store'}
+            </Link>
+          ) : (
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              {product?.store?.name || 'Platform Store'}
+            </p>
+          )}
 
           <div className="mt-5 flex items-end justify-between gap-4">
             <div>
@@ -68,13 +83,18 @@ const ProductCard = ({ product, onAddToCart }) => {
                 {stock > 0 ? `${stock} in stock` : 'Unavailable'}
               </p>
             </div>
-            <div className="flex items-center gap-1 text-amber-400">
-              {[0, 1, 2].map((index) => (
-                <Star key={`filled-${index}`} className="h-4 w-4 fill-current" />
-              ))}
-              {[0, 1].map((index) => (
-                <Star key={`empty-${index}`} className="h-4 w-4 text-slate-300" />
-              ))}
+            <div className="text-right">
+              <div className="flex items-center justify-end gap-1 text-amber-400">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Star
+                    key={`star-${index}`}
+                    className={`h-4 w-4 ${index < roundedAverage ? 'fill-current' : 'text-slate-300'}`}
+                  />
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {ratingsCount > 0 ? `${averageRating.toFixed(1)} (${ratingsCount})` : 'No reviews'}
+              </p>
             </div>
           </div>
         </CardContent>

@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   Package,
   Settings,
   ShoppingCart,
@@ -13,9 +14,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Card, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
 
 const AdminLayout = ({ outletContext }) => {
+  const brandLogoSrc = '/brand-logo-transparent.png';
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
@@ -37,7 +38,9 @@ const AdminLayout = ({ outletContext }) => {
     { id: 'orders', label: 'Orders', icon: ShoppingCart, path: '/admin/orders' },
     { id: 'products', label: 'Products', icon: Package, path: '/admin/products' },
     { id: 'customers', label: 'Customers', icon: Users, path: '/admin/customers' },
+    { id: 'stores', label: 'Stores', icon: Store, path: '/admin/stores' },
     { id: 'reports', label: 'Reports', icon: ChartColumn, path: '/admin/reports' },
+    { id: 'reviews', label: 'Reviews', icon: MessageSquare, path: '/admin/reviews' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
@@ -65,12 +68,16 @@ const AdminLayout = ({ outletContext }) => {
                       isSidebarCollapsed ? 'min-w-0 justify-center' : 'min-w-[158px] gap-3'
                     }`}
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3D7BF3] text-white shadow-[0_12px_24px_rgba(61,123,243,0.34)]">
-                      <Store className="h-5 w-5 stroke-[2.4]" />
+                    <div className="flex h-12 w-12 items-center justify-center">
+                      <img
+                        src={brandLogoSrc}
+                        alt="e-KoopMart logo"
+                        className="max-h-full max-w-full object-contain"
+                      />
                     </div>
                     {!isSidebarCollapsed && (
                       <div className="shrink-0">
-                        <p className="text-lg font-bold leading-none text-[#303030]">Barbaza</p>
+                        <p className="text-base font-bold leading-none text-[#303030]">e-KoopMart</p>
                         <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-[#A7A29B]">Admin</p>
                       </div>
                     )}
@@ -87,7 +94,7 @@ const AdminLayout = ({ outletContext }) => {
                 </div>
 
                 <div className={`mt-5 ${isSidebarCollapsed ? 'flex flex-col items-center space-y-3' : 'space-y-1.5'}`}>
-                  {sidebarLinks.slice(0, 5).map((item) => {
+                  {sidebarLinks.slice(0, 7).map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
 
@@ -117,7 +124,7 @@ const AdminLayout = ({ outletContext }) => {
                 </div>
 
                 <div className={`mt-5 border-t border-[#F4EEE5] ${isSidebarCollapsed ? 'pt-4 flex flex-col items-center space-y-3' : 'pt-4'}`}>
-                  {sidebarLinks.slice(5).map((item) => {
+                  {sidebarLinks.slice(7).map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
 

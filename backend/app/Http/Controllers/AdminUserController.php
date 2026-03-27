@@ -21,6 +21,8 @@ class AdminUserController extends Controller
         $perPage = (int) ($validated['per_page'] ?? 20);
 
         $users = User::query()
+            ->with('store')
+            ->where('is_merchant', false)
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nestedQuery) use ($search) {
                     $nestedQuery
@@ -60,17 +62,24 @@ class AdminUserController extends Controller
             'email' => $payload['email'],
             'password' => Hash::make($payload['password']),
             'is_admin' => (bool) ($payload['is_admin'] ?? false),
+            'is_merchant' => false,
+            'store_id' => null,
         ]);
 
         return response()->json([
             'message' => 'User created successfully',
-            'user' => $this->formatUser($user),
+            'user' => $this->formatUser($user->load('store')),
         ], 201);
     }
 
     public function update(Request $request, int $id)
     {
         $user = User::findOrFail($id);
+        if ($user->is_merchant) {
+            return response()->json([
+                'message' => 'Merchant accounts must be updated from store management.',
+            ], 422);
+        }
 
         $payload = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -102,13 +111,18 @@ class AdminUserController extends Controller
 
         return response()->json([
             'message' => 'User updated successfully',
-            'user' => $this->formatUser($user->fresh()),
+            'user' => $this->formatUser($user->fresh()->load('store')),
         ]);
     }
 
     public function destroy(Request $request, int $id)
     {
         $user = User::findOrFail($id);
+        if ($user->is_merchant) {
+            return response()->json([
+                'message' => 'Merchant accounts must be managed from store management.',
+            ], 422);
+        }
 
         if ($request->user()->id === $user->id) {
             return response()->json([
@@ -130,9 +144,16 @@ class AdminUserController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'is_admin' => (bool) $user->is_admin,
+            'is_merchant' => (bool) $user->is_merchant,
+            'store_id' => $user->store_id,
+            'store' => $user->store ? [
+                'id' => $user->store->id,
+                'name' => $user->store->name,
+                'slug' => $user->store->slug,
+                'status' => $user->store->status,
+            ] : null,
             'created_at' => optional($user->created_at)->toISOString(),
             'updated_at' => optional($user->updated_at)->toISOString(),
         ];
     }
 }
-

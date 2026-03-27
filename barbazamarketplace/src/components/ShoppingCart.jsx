@@ -281,12 +281,15 @@ const ShoppingCart = () => {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          min-width: 0;
         }
 
         .item-title {
           margin: 0;
           font-size: 0.95rem;
           color: #0B1739;
+          line-height: 1.3;
+          word-break: break-word;
         }
 
         .item-variant {
@@ -406,8 +409,28 @@ const ShoppingCart = () => {
             max-width: 100%;
           }
 
+          .cart-items {
+            padding: 0.75rem;
+          }
+
           .cart-item {
             grid-template-columns: 60px 1fr;
+            gap: 0.75rem;
+            padding: 0.875rem 0.75rem;
+          }
+
+          .item-image {
+            width: 60px;
+            height: 60px;
+          }
+
+          .item-title {
+            font-size: 0.92rem;
+          }
+
+          .item-variant,
+          .item-price {
+            font-size: 0.82rem;
           }
 
           .item-actions {

@@ -1,0 +1,525 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Boxes, ShoppingCart, Store, Wallet } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { fetchMerchantOrders, fetchMerchantProducts, fetchMerchantStore } from '../api/EcommerceApi';
+import { useToast } from '../components/ui/use-toast';
+import { formatPeso } from '../lib/marketplace';
+
+const MERCHANT_OVERVIEW_PAGE_SIZE = 24;
+const MERCHANT_ORDERS_PAGE_SIZE = 100;
+const ORDER_STATUS_SEQUENCE = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+const STATUS_COLORS = {
+  pending: '#F59E0B',
+  processing: '#2EA7FF',
+  shipped: '#2954C8',
+  delivered: '#12B981',
+  cancelled: '#EF4444',
+  refunded: '#94A3B8',
+};
+const NON_REVENUE_STATUSES = new Set(['cancelled', 'refunded']);
+
+const toMonthKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+const normalizeOrderStatus = (status) => String(status || 'pending').toLowerCase();
+const statusLabel = (status) => normalizeOrderStatus(status).replace(/^\w/, (char) => char.toUpperCase());
+const shortLabel = (text, maxLength = 18) => {
+  const value = String(text || '').trim();
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 3)}...`;
+};
+
+const MerchantOverviewPage = () => {
+  const { toast } = useToast();
+  const [store, setStore] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadAllProducts = useCallback(async () => {
+    let page = 1;
+    let hasMore = true;
+    const allProducts = [];
+
+    while (hasMore) {
+      const response = await fetchMerchantProducts({
+        page,
+        per_page: MERCHANT_OVERVIEW_PAGE_SIZE,
+        sort: 'name',
+      });
+      const pageProducts = Array.isArray(response?.products) ? response.products : [];
+      allProducts.push(...pageProducts);
+      hasMore = Boolean(response?.meta?.has_more_pages);
+      page += 1;
+    }
+
+    return allProducts;
+  }, []);
+
+  const loadAllOrders = useCallback(async () => {
+    let page = 1;
+    let hasMore = true;
+    const allOrders = [];
+
+    while (hasMore) {
+      const response = await fetchMerchantOrders({
+        page,
+        per_page: MERCHANT_ORDERS_PAGE_SIZE,
+        status: 'all',
+      });
+      const pageOrders = Array.isArray(response?.orders) ? response.orders : [];
+      allOrders.push(...pageOrders);
+      hasMore = Boolean(response?.meta?.has_more_pages);
+      page += 1;
+    }
+
+    return allOrders;
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [storeResponse, allProducts, allOrders] = await Promise.all([
+        fetchMerchantStore(),
+        loadAllProducts(),
+        loadAllOrders(),
+      ]);
+
+      setStore(storeResponse?.store || null);
+      setProducts(allProducts);
+      setOrders(allOrders);
+    } catch (error) {
+      toast({
+        title: 'Unable to load merchant portal',
+        description: error?.message || 'Failed to load merchant summary.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [loadAllOrders, loadAllProducts, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const inventoryValue = useMemo(
+    () =>
+      products.reduce(
+        (total, product) => total + Number(product?.price || 0) * Number(product?.stock || 0),
+        0
+      ),
+    [products]
+  );
+
+  const revenueOrders = useMemo(
+    () => orders.filter((order) => !NON_REVENUE_STATUSES.has(normalizeOrderStatus(order?.status))),
+    [orders]
+  );
+
+  const grossRevenue = useMemo(
+    () => revenueOrders.reduce((total, order) => total + Number(order?.store_subtotal_amount || 0), 0),
+    [revenueOrders]
+  );
+
+  const averageOrderValue = useMemo(
+    () => (revenueOrders.length > 0 ? grossRevenue / revenueOrders.length : 0),
+    [grossRevenue, revenueOrders.length]
+  );
+
+  const monthlyPerformance = useMemo(() => {
+    const now = new Date();
+    const frames = [];
+
+    for (let monthOffset = 5; monthOffset >= 0; monthOffset -= 1) {
+      const frameDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
+      frames.push({
+        key: toMonthKey(frameDate),
+        label: frameDate.toLocaleString('en-US', { month: 'short' }),
+        orders: 0,
+        revenue: 0,
+      });
+    }
+
+    const frameByKey = new Map(frames.map((item) => [item.key, item]));
+
+    orders.forEach((order) => {
+      const createdAt = new Date(order?.created_at);
+      if (Number.isNaN(createdAt.getTime())) {
+        return;
+      }
+
+      const key = toMonthKey(createdAt);
+      const frame = frameByKey.get(key);
+      if (!frame) {
+        return;
+      }
+
+      frame.orders += 1;
+      if (!NON_REVENUE_STATUSES.has(normalizeOrderStatus(order?.status))) {
+        frame.revenue += Number(order?.store_subtotal_amount || 0);
+      }
+    });
+
+    return frames.map((frame) => ({
+      ...frame,
+      revenue: Math.round(frame.revenue * 100) / 100,
+    }));
+  }, [orders]);
+
+  const statusBreakdown = useMemo(() => {
+    const counts = ORDER_STATUS_SEQUENCE.reduce(
+      (accumulator, status) => ({ ...accumulator, [status]: 0 }),
+      {}
+    );
+
+    orders.forEach((order) => {
+      const status = normalizeOrderStatus(order?.status);
+      if (Object.prototype.hasOwnProperty.call(counts, status)) {
+        counts[status] += 1;
+      }
+    });
+
+    return ORDER_STATUS_SEQUENCE
+      .map((status) => ({
+        status,
+        label: statusLabel(status),
+        count: counts[status] || 0,
+        color: STATUS_COLORS[status],
+      }))
+      .filter((item) => item.count > 0);
+  }, [orders]);
+
+  const topProductsByRevenue = useMemo(() => {
+    const totalsByProduct = new Map();
+
+    revenueOrders.forEach((order) => {
+      const storeItems = Array.isArray(order?.store_items) ? order.store_items : [];
+      storeItems.forEach((item) => {
+        const key = item?.product_id || item?.name;
+        if (!key) return;
+
+        const name = String(item?.name || `Product #${item?.product_id || 'N/A'}`);
+        const previous = totalsByProduct.get(key) || { name, revenue: 0, units: 0 };
+        const quantity = Number(item?.quantity || 0);
+        const revenue = Number(item?.total_price || Number(item?.price || 0) * quantity);
+
+        totalsByProduct.set(key, {
+          name,
+          revenue: previous.revenue + revenue,
+          units: previous.units + quantity,
+        });
+      });
+    });
+
+    return Array.from(totalsByProduct.values())
+      .sort((left, right) => right.revenue - left.revenue)
+      .slice(0, 6)
+      .map((item) => ({
+        ...item,
+        label: shortLabel(item.name, 20),
+        revenue: Math.round(item.revenue * 100) / 100,
+      }));
+  }, [revenueOrders]);
+
+  const inventoryByCategory = useMemo(() => {
+    const buckets = new Map();
+
+    products.forEach((product) => {
+      const category = String(product?.category || 'Uncategorized').trim() || 'Uncategorized';
+      const quantity = Number(product?.stock || 0);
+      const value = Number(product?.price || 0) * quantity;
+      const previous = buckets.get(category) || { category, quantity: 0, value: 0 };
+
+      buckets.set(category, {
+        category,
+        quantity: previous.quantity + quantity,
+        value: previous.value + value,
+      });
+    });
+
+    return Array.from(buckets.values())
+      .sort((left, right) => right.value - left.value)
+      .slice(0, 6)
+      .map((item) => ({
+        ...item,
+        value: Math.round(item.value * 100) / 100,
+      }));
+  }, [products]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">Merchant Dashboard</h2>
+        <p className="text-sm text-slate-500">Revenue, orders, inventory, and product performance in one view.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-500">Store</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Store className="h-5 w-5 text-[#2954C8]" />
+              <p className="text-lg font-bold text-slate-800">{store?.name || 'Merchant Store'}</p>
+            </div>
+            <Badge className={`mt-3 ${store?.status === 'active' ? 'bg-emerald-600 text-white' : 'bg-slate-500 text-white'}`}>
+              {store?.status || 'active'}
+            </Badge>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-500">Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Boxes className="h-5 w-5 text-[#2954C8]" />
+              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : products.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-500">Inventory Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-slate-800">{loading ? '--' : formatPeso(inventoryValue)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-500">Gross Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-[#2954C8]" />
+              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : formatPeso(grossRevenue)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-500">Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-[#2954C8]" />
+              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : orders.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-slate-800">Store Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-600">
+            {store?.description?.trim() || 'No store description yet. Update it from Merchant Settings.'}
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-800">Revenue and Orders (Last 6 Months)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyPerformance}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                  <YAxis yAxisId="left" axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    tickFormatter={(value) => `${Math.round(Number(value || 0) / 1000)}k`}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }}
+                    formatter={(value, name) => {
+                      if (name === 'Revenue') return [formatPeso(value), 'Revenue'];
+                      return [Number(value || 0), 'Orders'];
+                    }}
+                  />
+                  <Bar yAxisId="left" dataKey="orders" name="Orders" fill="#BFDBFE" radius={[6, 6, 0, 0]} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Revenue"
+                    stroke="#2954C8"
+                    strokeWidth={3}
+                    dot={{ r: 3, fill: '#2954C8' }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-600">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gross Revenue</p>
+                <p className="mt-1 font-semibold text-slate-800">{formatPeso(grossRevenue)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-600">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Orders</p>
+                <p className="mt-1 font-semibold text-slate-800">{Number(orders.length || 0).toLocaleString('en-US')}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-600">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Avg Order Value</p>
+                <p className="mt-1 font-semibold text-slate-800">{formatPeso(averageOrderValue)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-800">Order Status Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statusBreakdown.length === 0 ? (
+              <p className="py-20 text-center text-sm text-slate-500">No orders yet.</p>
+            ) : (
+              <>
+                <div className="h-[240px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusBreakdown}
+                        dataKey="count"
+                        nameKey="label"
+                        innerRadius={64}
+                        outerRadius={92}
+                        paddingAngle={3}
+                      >
+                        {statusBreakdown.map((slice) => (
+                          <Cell key={`status-${slice.status}`} fill={slice.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value, name) => [Number(value || 0), name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {statusBreakdown.map((slice) => (
+                    <div key={`legend-${slice.status}`} className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
+                        <p className="text-xs font-semibold text-slate-600">{slice.label}</p>
+                      </div>
+                      <p className="mt-1 text-sm font-bold text-slate-800">{slice.count}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-800">Top Products by Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topProductsByRevenue.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-500">No product sales yet.</p>
+            ) : (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topProductsByRevenue} layout="vertical" margin={{ top: 4, right: 14, left: 8, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                    <XAxis
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#64748B' }}
+                      tickFormatter={(value) => `${Math.round(Number(value || 0) / 1000)}k`}
+                    />
+                    <YAxis type="category" dataKey="label" width={128} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }}
+                      formatter={(value, name, context) => {
+                        if (name === 'Revenue') return [formatPeso(value), 'Revenue'];
+                        return [Number(context?.payload?.units || 0), 'Units Sold'];
+                      }}
+                    />
+                    <Bar dataKey="revenue" name="Revenue" fill="#2954C8" radius={[6, 6, 6, 6]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-slate-800">Inventory Value by Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {inventoryByCategory.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-500">No inventory data available.</p>
+            ) : (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={inventoryByCategory}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#64748B' }}
+                      tickFormatter={(value) => `${Math.round(Number(value || 0) / 1000)}k`}
+                    />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }}
+                      formatter={(value, _name, context) => [
+                        formatPeso(value),
+                        `${Number(context?.payload?.quantity || 0)} units`,
+                      ]}
+                    />
+                    <Bar dataKey="value" name="Inventory Value" fill="#2EA7FF" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default MerchantOverviewPage;

@@ -6,7 +6,6 @@ import {
   Menu,
   ShoppingBag,
   ShoppingCart,
-  Store,
   UserRound,
   X,
 } from 'lucide-react';
@@ -17,12 +16,15 @@ import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
 
 const Header = () => {
+  const brandLogoSrc = '/brand-logo-transparent.png';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { cartItems, setIsCartOpen } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const location = useLocation();
 
   const isAdminUser = isAuthenticated && user?.is_admin;
+  const isMerchantUser = isAuthenticated && user?.is_merchant;
+  const isStaffUser = isAdminUser || isMerchantUser;
   const cartItemCount = useMemo(
     () => cartItems.reduce((total, item) => total + item.quantity, 0),
     [cartItems]
@@ -31,6 +33,7 @@ const Header = () => {
   const navLinks = [
     { to: '/', label: 'Home' },
     { to: '/products', label: 'Marketplace' },
+    { to: '/stores', label: 'Stores' },
     { to: '/about', label: 'About' },
     { to: '/contact', label: 'Contact' },
   ];
@@ -42,7 +45,7 @@ const Header = () => {
       <div className="border-b border-[#e5edf8] bg-[#0b1739] text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 text-xs font-medium sm:px-6 lg:px-8">
           <p className="hidden sm:block text-white/75">
-            Community-first commerce powered by Barbaza MPC Marketplace
+            Community-first commerce powered by e-KoopMart
           </p>
           <div className="flex items-center gap-2">
             <Badge variant="info" className="bg-white/12 text-white">
@@ -55,19 +58,23 @@ const Header = () => {
 
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#3D7BF3] text-white shadow-[0_16px_30px_rgba(61,123,243,0.34)]">
-            <Store className="h-5 w-5 stroke-[2.4]" />
+          <div className="flex h-14 w-14 items-center justify-center">
+            <img
+              src={brandLogoSrc}
+              alt="e-KoopMart logo"
+              className="max-h-full max-w-full object-contain"
+            />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-[#303030]">
-              Barbaza MPC Marketplace
+              e-KoopMart
             </p>
-            <p className="truncate text-sm text-slate-500">Community marketplace</p>
+            <p className="truncate text-sm text-slate-500">Merkado para sa padayon nga pangabuhi</p>
           </div>
         </Link>
 
         <nav className="hidden items-center gap-1 rounded-full border border-[#dfe7f4] bg-white/90 p-1 lg:flex">
-          {!isAdminUser &&
+          {!isStaffUser &&
             navLinks.map((link) => (
               <Link
                 key={link.to}
@@ -92,7 +99,16 @@ const Header = () => {
             </Link>
           )}
 
-          {isAuthenticated && !isAdminUser && (
+          {isMerchantUser && (
+            <Link to="/merchant">
+              <Button variant="secondary" size="sm" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Merchant Portal
+              </Button>
+            </Link>
+          )}
+
+          {isAuthenticated && !isStaffUser && (
             <Link to="/account">
               <Button variant="outline" size="sm" className="gap-2">
                 <UserRound className="h-4 w-4" />
@@ -115,7 +131,7 @@ const Header = () => {
             </Button>
           )}
 
-          {!isAdminUser && (
+          {!isStaffUser && (
             <Button
               variant="default"
               size="icon"
@@ -146,7 +162,7 @@ const Header = () => {
       {isMobileMenuOpen && (
         <div className="border-t border-[#e5edf8] bg-white/95 px-4 py-4 backdrop-blur md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-3">
-            {!isAdminUser &&
+            {!isStaffUser &&
               navLinks.map((link) => (
                 <Link
                   key={link.to}
@@ -174,7 +190,18 @@ const Header = () => {
               </Link>
             )}
 
-            {isAuthenticated && !isAdminUser && (
+            {isMerchantUser && (
+              <Link
+                to="/merchant"
+                className="flex items-center gap-2 rounded-2xl border border-[#b9d5ff] bg-[#eef5ff] px-4 py-3 text-sm font-medium text-[#2954C8]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Merchant Portal
+              </Link>
+            )}
+
+            {isAuthenticated && !isStaffUser && (
               <Link
                 to="/account"
                 className="flex items-center gap-2 rounded-2xl border border-[#e5edf8] bg-white px-4 py-3 text-sm font-medium text-slate-700"
@@ -185,7 +212,7 @@ const Header = () => {
               </Link>
             )}
 
-            {!isAdminUser && (
+            {!isStaffUser && (
               <button
                 type="button"
                 className="flex items-center justify-between rounded-2xl border border-[#e5edf8] bg-white px-4 py-3 text-sm font-medium text-slate-700"

@@ -22,14 +22,18 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'is_admin' => false,
+            'is_merchant' => false,
+            'store_id' => null,
         ]);
+        $user->load('store');
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $this->formatAuthUser($user),
         ]);
     }
 
@@ -77,12 +81,13 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
+        $user->load('store');
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $this->formatAuthUser($user),
         ]);
     }
 
@@ -129,5 +134,39 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Password updated successfully',
         ]);
+    }
+
+    public function me(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $user->load('store');
+
+        return response()->json($this->formatAuthUser($user));
+    }
+
+    protected function formatAuthUser(User $user): array
+    {
+        $store = $user->store;
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'is_admin' => (bool) $user->is_admin,
+            'is_merchant' => (bool) $user->is_merchant,
+            'store_id' => $user->store_id,
+            'store' => $store ? [
+                'id' => $store->id,
+                'name' => $store->name,
+                'slug' => $store->slug,
+                'status' => $store->status,
+            ] : null,
+            'created_at' => optional($user->created_at)->toISOString(),
+            'updated_at' => optional($user->updated_at)->toISOString(),
+        ];
     }
 }

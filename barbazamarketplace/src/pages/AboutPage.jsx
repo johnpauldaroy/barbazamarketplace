@@ -147,8 +147,8 @@ const AboutPage = () => {
           <div className="surface-card relative overflow-hidden border-white/10 bg-white/12 p-4 backdrop-blur-md">
             <div className="relative overflow-hidden rounded-[26px]">
               <img
-                src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80"
-                alt="Aerial landscape view representing Barbaza, Antique"
+                src="/assets/images/local_farmer_antique.png"
+                alt="Local farmer in Antique province"
                 className="h-[420px] w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0b1739]/55 via-transparent to-[#0b1739]/15" />
@@ -170,15 +170,7 @@ const AboutPage = () => {
               </CardContent>
             </Card>
 
-            <Card className="absolute right-6 top-6 z-10 max-w-[250px] border-white/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
-              <CardContent className="flex items-center gap-3 p-4">
-                <CircleDot className="h-5 w-5 text-[#2EA7FF]" />
-                <div>
-                  <p className="text-sm font-semibold text-[#0b1739]">Serving Antique since {FOUNDING_YEAR}</p>
-                  <p className="text-xs leading-5 text-slate-600">Built on cooperation, service, and local trust.</p>
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
         </div>
       </section>

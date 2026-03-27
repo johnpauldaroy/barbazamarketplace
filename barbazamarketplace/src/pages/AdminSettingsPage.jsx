@@ -1,11 +1,86 @@
-import React from 'react';
-import { Save, Shield, Bell, CreditCard, Store, Globe } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Save, Shield, Store, Globe, Tags } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { useToast } from '../components/ui/use-toast';
+import { createCategory, getCategories } from '../api/EcommerceApi';
 
 const AdminSettingsPage = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
+  const loadCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    try {
+      const response = await getCategories();
+      setCategories(Array.isArray(response) ? response : []);
+    } catch (error) {
+      setCategories([]);
+      toast({
+        title: 'Unable to load categories',
+        description: error?.message || 'Failed to fetch category options.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const sortedCategories = useMemo(
+    () =>
+      Array.from(new Set(categories.map((category) => String(category || '').trim()).filter(Boolean))).sort((left, right) =>
+        left.localeCompare(right)
+      ),
+    [categories]
+  );
+
+  const handleCreateCategory = async (event) => {
+    event.preventDefault();
+
+    const name = newCategoryName.trim();
+    if (!name) {
+      toast({
+        title: 'Category is required',
+        description: 'Enter a category name before adding it.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSavingCategory(true);
+    try {
+      const response = await createCategory({ name });
+      const updatedCategories = Array.isArray(response?.categories) ? response.categories : [...sortedCategories, name];
+
+      setCategories(updatedCategories);
+      setNewCategoryName('');
+      toast({
+        title: 'Category saved',
+        description: `${name} is now available for products.`,
+        variant: 'success',
+      });
+    } catch (error) {
+      toast({
+        title: 'Unable to add category',
+        description: error?.message || 'Failed to create category.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -64,6 +139,55 @@ const AdminSettingsPage = () => {
                 <Badge className="bg-blue-600 text-white">Owner</Badge>
               </div>
               <Button variant="outline" className="w-full rounded-xl border-slate-200 text-xs font-bold">Manage Permissions</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-white/70 shadow-lg backdrop-blur-md">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Tags className="h-5 w-5 text-indigo-600" />
+                <CardTitle className="text-lg">Category</CardTitle>
+              </div>
+              <CardDescription>Create and manage category names for products.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCreateCategory}>
+                <Input
+                  value={newCategoryName}
+                  onChange={(event) => setNewCategoryName(event.target.value)}
+                  placeholder="e.g. Fruits"
+                  className="rounded-xl border-slate-200"
+                  disabled={isSavingCategory}
+                />
+                <Button type="submit" className="rounded-xl bg-[#2954C8]" disabled={isSavingCategory}>
+                  {isSavingCategory ? 'Adding...' : 'Add Category'}
+                </Button>
+              </form>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Available Categories</p>
+                {isLoadingCategories ? (
+                  <p className="mt-2 text-xs text-slate-400">Loading categories...</p>
+                ) : sortedCategories.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-400">No categories added yet.</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {sortedCategories.map((category) => (
+                      <Badge key={category} variant="outline" className="border-slate-300 text-slate-600">
+                        {category}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full rounded-xl border-slate-200 text-xs font-bold"
+                onClick={() => navigate('/admin/products')}
+              >
+                Open Product Categories
+              </Button>
             </CardContent>
           </Card>
         </div>
