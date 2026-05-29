@@ -162,7 +162,7 @@ const AdminDashboard = () => {
     return recentOrders.slice(0, 5).map(order => ({
       id: `act-${order.id}`,
       type: 'order',
-      title: `Order #${order.id} ${order.status}`,
+      title: `Order #${order.id} - ${order.customer?.name || 'Guest'}`,
       description: `${order.customer?.name || 'Guest'} placed an order for ${formatPeso(order.total_amount)}`,
       time: formatOrderDate(order.created_at),
       icon: ShoppingCart,
@@ -220,7 +220,10 @@ const AdminDashboard = () => {
     handleStatusChange,
     updatingOrderId,
     loading,
-    dashboard
+    refreshing,
+    lastSync,
+    onRefresh: () => loadDashboard(true),
+    dashboard,
   };
 
   return (

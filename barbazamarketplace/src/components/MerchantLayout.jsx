@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Menu, MessageSquare, Package, Settings, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, LogOut, Menu, MessageSquare, Package, Settings, ShoppingCart, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Card, CardContent } from './ui/card';
 
@@ -10,6 +10,7 @@ const MerchantLayout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const storeName = useMemo(() => user?.store?.name || 'Merchant Store', [user?.store?.name]);
@@ -33,6 +34,65 @@ const MerchantLayout = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#1E293B] antialiased">
+      {/* Mobile top bar */}
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 xl:hidden">
+        <button type="button" onClick={() => navigate('/merchant')} className="flex items-center gap-2">
+          <img src={brandLogoSrc} alt="e-KoopMart" className="h-8 w-8 object-contain" />
+          <span className="text-sm font-bold text-[#303030] truncate max-w-[160px]">{storeName}</span>
+        </button>
+        <button
+          type="button"
+          aria-label="Open navigation"
+          onClick={() => setIsMobileNavOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Mobile nav drawer */}
+      {isMobileNavOpen && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40 xl:hidden" onClick={() => setIsMobileNavOpen(false)} />
+          <div className="fixed bottom-0 left-0 top-0 z-50 w-72 overflow-y-auto bg-white shadow-2xl xl:hidden">
+            <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
+              <span className="text-sm font-bold text-[#303030] truncate">{storeName}</span>
+              <button type="button" onClick={() => setIsMobileNavOpen(false)} className="flex h-9 w-9 items-center justify-center text-slate-500">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-1.5">
+              {links.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.path === '/merchant' ? location.pathname === item.path : location.pathname.startsWith(item.path);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { navigate(item.path); setIsMobileNavOpen(false); }}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition ${isActive ? 'bg-[#2954C8] text-white' : 'text-[#8D8A86] hover:bg-[#FFF7F0] hover:text-[#4D4A46]'}`}
+                  >
+                    <Icon className="h-[18px] w-[18px]" />
+                    {item.label}
+                  </button>
+                );
+              })}
+              <div className="border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  disabled={isLoggingOut}
+                  onClick={() => { handleLogout(); setIsMobileNavOpen(false); }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-[#C15555] hover:bg-[#FFF1F1]"
+                >
+                  <LogOut className="h-[18px] w-[18px]" />
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="mx-auto max-w-[1680px] px-4 py-4 lg:px-6 lg:py-5 xl:px-7 2xl:px-8">
         <div className={`grid gap-5 ${isSidebarCollapsed ? 'xl:grid-cols-[132px_minmax(0,1fr)]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
           <aside className="xl:sticky xl:top-6 xl:self-start">

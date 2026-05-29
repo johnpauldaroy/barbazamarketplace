@@ -40,13 +40,18 @@ const apiRequest = async (endpoint, options = {}) => {
         // Commonly: backend down, wrong URL/port, or CORS blocked
         const msg = err?.message || String(err);
         if (err?.name === 'AbortError') {
-            throw new Error(`Request timed out calling ${url}`);
+            throw new Error('Request timed out. Please try again.');
         }
-        throw new Error(`Network error calling ${url}: ${msg}`);
+        throw new Error(`Network error: ${msg}`);
     }
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+        // Clear stale token on 401 so the app doesn't stay in a broken auth state
+        if (response.status === 401) {
+            localStorage.removeItem('auth_token');
+        }
+
         const body = await parseJsonSafely(response);
         const message =
             body?.message ||
@@ -54,7 +59,7 @@ const apiRequest = async (endpoint, options = {}) => {
             (typeof body === 'string' ? body : null) ||
             `${response.status} ${response.statusText}`;
 
-        throw new Error(`API Error calling ${url}: ${message}`);
+        throw new Error(message);
     }
 
     return parseJsonSafely(response);

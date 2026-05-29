@@ -1,0 +1,303 @@
+[
+  {
+    "page": "01-home",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Golden Start Noodles & Miki Ha",
+        "w": 324,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Batwan Powder",
+        "w": 324,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "text": "Golden Start Noodles & Miki Ha",
+        "w": 324,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Ginger Powder",
+        "w": 324,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "text": "Golden Start Noodles & Miki Ha",
+        "w": 324,
+        "h": 16
+      }
+    ]
+  },
+  {
+    "page": "02-products",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 34,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Golden Start Noodles & Miki Ha",
+        "w": 324,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Veggie Stick",
+        "w": 324,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "text": "Golden Start Noodles & Miki Ha",
+        "w": 324,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Turmeric Powder",
+        "w": 324,
+        "h": 19
+      }
+    ]
+  },
+  {
+    "page": "03-login",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Create account",
+        "w": 104,
+        "h": 17
+      },
+      {
+        "tag": "A",
+        "text": "terms and cooperative values",
+        "w": 168,
+        "h": 15
+      },
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "04-register",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Log in",
+        "w": 41,
+        "h": 17
+      },
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "About us",
+        "w": 59,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "05-cart-empty",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 34,
+        "h": 16
+      },
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "About us",
+        "w": 59,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "06-about",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "About us",
+        "w": 59,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Contact",
+        "w": 52,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "07-contact",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "About us",
+        "w": 59,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Contact",
+        "w": 52,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "08-stores",
+    "type": "small-tap-target",
+    "detail": "5 targets < 40px",
+    "elements": [
+      {
+        "tag": "A",
+        "text": "Home",
+        "w": 39,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Marketplace",
+        "w": 82,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Stores",
+        "w": 42,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "About us",
+        "w": 59,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "text": "Contact",
+        "w": 52,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "page": "09-mobile-menu-open",
+    "type": "info",
+    "detail": "Menu drawer screenshot taken"
+  }
+]

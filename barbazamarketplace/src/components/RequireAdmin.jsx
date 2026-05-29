@@ -6,7 +6,11 @@ const RequireAdmin = ({ children }) => {
   const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2954C8] border-t-transparent" />
+      </div>
+    );
   }
 
   if (!isAuthenticated) {

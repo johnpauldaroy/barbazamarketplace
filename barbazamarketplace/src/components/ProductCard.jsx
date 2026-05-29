@@ -1,10 +1,6 @@
 import React, { memo } from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
 import { formatPeso, resolveProductImage } from '../lib/marketplace';
 
 const ProductCard = ({ product, onAddToCart }) => {
@@ -13,93 +9,113 @@ const ProductCard = ({ product, onAddToCart }) => {
   const stock = Number(product.stock || 0);
   const averageRating = Number(product?.review_summary?.average_rating || 0);
   const ratingsCount = Number(product?.review_summary?.ratings_count || 0);
-  const roundedAverage = Math.round(averageRating);
   const imageUrl = resolveProductImage(product.image);
   const isLowStock = stock > 0 && stock < 20;
   const isOutOfStock = stock <= 0;
 
   return (
-    <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.2 }} className="h-full">
-      <Card className="group flex h-full flex-col overflow-hidden rounded-[30px] border border-white/80 bg-white/95 shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-all duration-300 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
-        <Link to={`/product/${product.id}`} className="relative block overflow-hidden">
-          <div className="aspect-[1/0.92] overflow-hidden bg-gradient-to-br from-[#eef5ff] via-white to-[#dfeeff]">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={title}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
-                No image available
-              </div>
-            )}
-          </div>
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-[#dfe7f4] bg-white shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      {/* Image */}
+      <Link to={`/product/${product.id}`} className="relative block overflow-hidden">
+        <div className="aspect-[4/3] overflow-hidden bg-[#f4f7fd]">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={title}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+              No image
+            </div>
+          )}
+        </div>
 
-          <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-2">
-            {isLowStock && <Badge variant="warning">Low stock</Badge>}
-            {isOutOfStock && <Badge variant="destructive">Sold out</Badge>}
-          </div>
+        {/* Badges */}
+        <div className="absolute left-3 top-3 flex flex-col gap-1">
+          {isOutOfStock && (
+            <span className="badge-red">Sold out</span>
+          )}
+          {isLowStock && !isOutOfStock && (
+            <span className="badge-amber">Low stock</span>
+          )}
+        </div>
 
-          <Button
-            size="icon"
-            onClick={(event) => {
-              event.preventDefault();
-              onAddToCart?.(product);
-            }}
-            disabled={isOutOfStock}
-            className="absolute bottom-4 right-4 h-12 w-12 rounded-full border-4 border-white bg-[#2954C8] shadow-[0_16px_30px_rgba(41,84,200,0.28)]"
-            aria-label={`Add ${title} to cart`}
+        {/* Quick-add button — visible on hover (desktop), hidden on mobile (uses bottom button instead) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onAddToCart?.(product);
+          }}
+          disabled={isOutOfStock}
+          aria-label={`Add ${title} to cart`}
+          className="absolute bottom-3 right-3 hidden h-10 w-10 items-center justify-center rounded-lg bg-[#2954C8] text-white shadow-lg opacity-0 translate-y-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 sm:flex"
+        >
+          <ShoppingCart className="h-4 w-4" />
+        </button>
+      </Link>
+
+      {/* Info */}
+      <div className="flex flex-1 flex-col p-4">
+        {product?.store?.slug ? (
+          <Link
+            to={`/stores/${product.store.slug}`}
+            className="mb-1 text-xs font-medium text-[#2954C8] hover:underline"
           >
-            <ShoppingCart className="h-4 w-4" />
-          </Button>
+            {product?.store?.name || 'Platform Store'}
+          </Link>
+        ) : (
+          <p className="mb-1 text-xs font-medium text-slate-400">
+            {product?.store?.name || 'Platform Store'}
+          </p>
+        )}
+
+        <Link to={`/product/${product.id}`} className="block flex-1">
+          <h3 className="clamp-2 text-sm font-semibold leading-snug text-[#0b1739] transition-colors group-hover:text-[#2954C8]">
+            {title}
+          </h3>
         </Link>
 
-        <CardContent className="flex flex-1 flex-col p-6">
-          <Link to={`/product/${product.id}`} className="block">
-            <h3 className="line-clamp-2 text-[1.05rem] font-semibold leading-8 text-[#0b1739] transition-colors group-hover:text-[#2954C8]">
-              {title}
-            </h3>
-          </Link>
-          {product?.store?.slug ? (
-            <Link
-              to={`/stores/${product.store.slug}`}
-              className="mt-1 inline-block text-xs font-medium text-slate-500 hover:text-[#2954C8]"
-            >
-              {product?.store?.name || 'Platform Store'}
-            </Link>
-          ) : (
-            <p className="mt-1 text-xs font-medium text-slate-500">
-              {product?.store?.name || 'Platform Store'}
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <div>
+            <p className="text-lg font-bold text-[#0b1739]">{formatPeso(price)}</p>
+            <p className="text-[11px] text-slate-400">
+              {stock > 0 ? `${stock} in stock` : 'Out of stock'}
             </p>
-          )}
+          </div>
 
-          <div className="mt-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xl font-bold text-[#0b1739]">{formatPeso(price)}</p>
-              <p className="mt-1 text-sm text-slate-500">
-                {stock > 0 ? `${stock} in stock` : 'Unavailable'}
-              </p>
-            </div>
+          {ratingsCount > 0 ? (
             <div className="text-right">
-              <div className="flex items-center justify-end gap-1 text-amber-400">
-                {Array.from({ length: 5 }).map((_, index) => (
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
                   <Star
-                    key={`star-${index}`}
-                    className={`h-4 w-4 ${index < roundedAverage ? 'fill-current' : 'text-slate-300'}`}
+                    key={i}
+                    className={`h-3 w-3 ${i < Math.round(averageRating) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
                   />
                 ))}
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {ratingsCount > 0 ? `${averageRating.toFixed(1)} (${ratingsCount})` : 'No reviews'}
+              <p className="mt-0.5 text-[10px] text-slate-400">
+                {averageRating.toFixed(1)} ({ratingsCount})
               </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          ) : null}
+        </div>
+
+        {/* Add to cart — always visible on mobile (below sm breakpoint), hidden on desktop */}
+        <button
+          type="button"
+          onClick={() => onAddToCart?.(product)}
+          disabled={isOutOfStock}
+          className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#dfe7f4] bg-white text-xs font-semibold text-[#2954C8] transition-colors hover:border-[#2954C8] hover:bg-[#eef3fb] disabled:cursor-not-allowed disabled:opacity-40 sm:hidden"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          {isOutOfStock ? 'Out of stock' : 'Add to cart'}
+        </button>
+      </div>
+    </div>
   );
 };
 

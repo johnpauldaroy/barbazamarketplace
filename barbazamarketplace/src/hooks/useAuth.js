@@ -75,7 +75,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const token = localStorage.getItem('auth_token');
     const value = {
         user,
         login,
@@ -83,7 +82,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         loading,
         error,
-        isAuthenticated: !!user || !!token
+        isAuthenticated: !!user,
     };
 
     return (

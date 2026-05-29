@@ -1,446 +1,179 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ImageIcon, Minus, ShoppingCart as ShoppingCartIcon, Trash2, X } from 'lucide-react';
+import { ImageIcon, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
+
+const fmt = (cents) =>
+  `PHP ${Number(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const ShoppingCart = () => {
   const navigate = useNavigate();
-  const {
-    cartItems,
-    removeFromCart,
-    updateQuantity,
-    getCartTotal,
-    isCartOpen,
-    setIsCartOpen,
-  } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, getCartTotal, isCartOpen, setIsCartOpen } = useCart();
 
   if (!isCartOpen) return null;
 
-  const handleCheckout = () => {
-    setIsCartOpen(false);
-    navigate('/checkout');
+  const itemTotal = (item) => {
+    const price = item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
+    return fmt(price * item.quantity);
   };
+  const unitPrice = (item) => {
+    const price = item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
+    return fmt(price);
+  };
+  const getMaxQty = (item) =>
+    item.variant.manage_inventory && typeof item.variant.inventory_quantity === 'number'
+      ? item.variant.inventory_quantity
+      : Infinity;
 
-  const getItemPrice = (item) => {
-    const price = item.variant.sale_price_in_cents ?? item.variant.price_in_cents;
-    return `PHP ${Number(price / 100).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
-
-  const getItemTotal = (item) => {
-    const price = item.variant.sale_price_in_cents ?? item.variant.price_in_cents;
-    return `PHP ${Number((price * item.quantity) / 100).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
+  const totalCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <>
-      <div className="cart-overlay" onClick={() => setIsCartOpen(false)} />
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        onClick={() => setIsCartOpen(false)}
+        aria-hidden="true"
+      />
 
-      <div className="cart-sidebar">
-        <div className="cart-header">
-          <h2>Shopping Cart</h2>
+      {/* Drawer */}
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col bg-white shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#dfe7f4] px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <ShoppingBag className="h-5 w-5 text-[#2954C8]" />
+            <h2 className="text-base font-bold text-[#0b1739]">
+              Shopping Cart
+              {totalCount > 0 && (
+                <span className="ml-2 rounded-full bg-[#eef3fb] px-2 py-0.5 text-xs font-semibold text-[#2954C8]">
+                  {totalCount}
+                </span>
+              )}
+            </h2>
+          </div>
           <button
-            className="close-button"
+            type="button"
             onClick={() => setIsCartOpen(false)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-[#f4f7fd] hover:text-slate-700 transition-colors"
             aria-label="Close cart"
           >
-            <X size={18} />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="cart-content">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
           {cartItems.length === 0 ? (
-            <div className="empty-cart">
-              <span className="empty-icon">
-                <ShoppingCartIcon size={56} strokeWidth={1.6} />
-              </span>
-              <p>Your cart is empty</p>
+            <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef3fb]">
+                <ShoppingBag className="h-7 w-7 text-[#2954C8] opacity-50" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-[#0b1739]">Your cart is empty</p>
+                <p className="mt-1 text-sm text-slate-400">Add products to get started.</p>
+              </div>
               <button
-                className="continue-shopping"
-                onClick={() => {
-                  setIsCartOpen(false);
-                  navigate('/products');
-                }}
+                type="button"
+                onClick={() => { setIsCartOpen(false); navigate('/products'); }}
+                className="mt-2 rounded-lg bg-[#2954C8] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1f44a5] transition-colors"
               >
-                Continue Shopping
+                Browse marketplace
               </button>
             </div>
           ) : (
-            <>
-              <div className="cart-items">
-                {cartItems.map((item) => (
-                  <div key={item.variant.id} className="cart-item">
-                    <div className="item-image">
-                      {item.product.thumbnail_url ? (
-                        <img src={item.product.thumbnail_url} alt={item.product.title} />
-                      ) : (
-                        <div className="placeholder-image">
-                          <ImageIcon size={28} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="item-details">
-                      <h4 className="item-title">{item.product.title}</h4>
-                      <p className="item-variant">{item.variant.title}</p>
-                      <p className="item-price">{getItemPrice(item)}</p>
-                    </div>
-                    <div className="item-actions">
-                      <div className="quantity-controls">
-                        <button
-                          onClick={() =>
-                            updateQuantity(item.variant.id, Math.max(1, item.quantity - 1))
-                          }
-                          disabled={item.quantity <= 1}
-                          aria-label="Decrease quantity"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span>{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.variant.id, item.quantity + 1)}
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
+            <ul className="divide-y divide-[#f0f4fc] px-5">
+              {cartItems.map((item) => (
+                <li key={item.variant.id} className="flex gap-4 py-4">
+                  {/* Image */}
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd]">
+                    {item.product.thumbnail_url ? (
+                      <img
+                        src={item.product.thumbnail_url}
+                        alt={item.product.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-slate-300">
+                        <ImageIcon className="h-6 w-6" />
                       </div>
-                      <p className="item-total">{getItemTotal(item)}</p>
+                    )}
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="clamp-2 text-sm font-semibold text-[#0b1739]">{item.product.title}</p>
+                    <p className="text-xs text-slate-400">{item.variant.title}</p>
+                    <p className="text-sm font-bold text-[#2954C8]">{unitPrice(item)}</p>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="flex shrink-0 flex-col items-end justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.variant.id)}
+                      aria-label="Remove"
+                      className="text-slate-300 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+
+                    <div className="flex items-center overflow-hidden rounded-lg border border-[#dfe7f4]">
                       <button
-                        className="remove-button"
-                        onClick={() => removeFromCart(item.variant.id)}
-                        aria-label="Remove item"
+                        type="button"
+                        onClick={() => updateQuantity(item.variant.id, Math.max(1, item.quantity - 1))}
+                        disabled={item.quantity <= 1}
+                        className="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-[#f4f7fd] disabled:opacity-40 transition-colors"
+                        aria-label="Decrease"
                       >
-                        <Trash2 size={16} />
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="min-w-[28px] text-center text-xs font-semibold text-[#0b1739]">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.variant.id, item.quantity + 1)}
+                        disabled={Number.isFinite(getMaxQty(item)) && item.quantity >= getMaxQty(item)}
+                        className="flex h-7 w-7 items-center justify-center text-slate-500 hover:bg-[#f4f7fd] disabled:opacity-40 transition-colors"
+                        aria-label="Increase"
+                      >
+                        <Plus className="h-3 w-3" />
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
 
-              <div className="cart-footer">
-                <div className="cart-total">
-                  <span>Total:</span>
-                  <span className="total-amount">{getCartTotal()}</span>
-                </div>
-                <button className="checkout-button" onClick={handleCheckout}>
-                  Proceed to Checkout
-                </button>
-              </div>
-            </>
+                    <p className="text-xs font-semibold text-[#0b1739]">{itemTotal(item)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
+
+        {/* Footer */}
+        {cartItems.length > 0 && (
+          <div className="border-t border-[#dfe7f4] p-5 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="text-lg font-bold text-[#0b1739]">{getCartTotal()}</span>
+            </div>
+            <p className="text-xs text-slate-400">Shipping calculated at checkout</p>
+            <button
+              type="button"
+              onClick={() => { setIsCartOpen(false); navigate('/checkout'); }}
+              className="w-full rounded-lg bg-[#2954C8] py-3 text-sm font-semibold text-white hover:bg-[#1f44a5] transition-colors"
+            >
+              Proceed to Checkout
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsCartOpen(false); navigate('/cart'); }}
+              className="w-full rounded-lg border border-[#dfe7f4] py-2.5 text-sm font-medium text-slate-600 hover:bg-[#f4f7fd] transition-colors"
+            >
+              View full cart
+            </button>
+          </div>
+        )}
       </div>
-
-      <style>{`
-        .cart-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 200;
-          animation: fadeIn 0.2s ease;
-        }
-
-        .cart-sidebar {
-          position: fixed;
-          top: 0;
-          right: 0;
-          width: 100%;
-          max-width: 420px;
-          height: 100vh;
-          background: white;
-          z-index: 201;
-          display: flex;
-          flex-direction: column;
-          animation: slideIn 0.3s ease;
-          box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        @keyframes slideIn {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-
-        .cart-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1.25rem 1.5rem;
-          border-bottom: 1px solid #E1E8F3;
-          background: #F8FAFE;
-        }
-
-        .cart-header h2 {
-          margin: 0;
-          font-size: 1.25rem;
-          color: #0B1739;
-        }
-
-        .close-button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 0.5rem;
-          color: #7488A3;
-          transition: color 0.2s;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .close-button:hover {
-          color: #0B1739;
-        }
-
-        .cart-content {
-          flex: 1;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .empty-cart {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 1rem;
-          color: #7488A3;
-          padding: 2rem;
-        }
-
-        .empty-icon {
-          opacity: 0.5;
-          color: #A7B4C8;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .continue-shopping {
-          background: #2954C8;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: background 0.2s;
-        }
-
-        .continue-shopping:hover {
-          background: #2EA7FF;
-        }
-
-        .cart-items {
-          flex: 1;
-          padding: 1rem;
-        }
-
-        .cart-item {
-          display: grid;
-          grid-template-columns: 80px 1fr auto;
-          gap: 1rem;
-          padding: 1rem;
-          border-bottom: 1px solid #E1E8F3;
-        }
-
-        .item-image {
-          width: 80px;
-          height: 80px;
-          border-radius: 8px;
-          overflow: hidden;
-          background: #F5F8FE;
-        }
-
-        .item-image img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .placeholder-image {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #94A3B8;
-        }
-
-        .item-details {
-          display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
-          min-width: 0;
-        }
-
-        .item-title {
-          margin: 0;
-          font-size: 0.95rem;
-          color: #0B1739;
-          line-height: 1.3;
-          word-break: break-word;
-        }
-
-        .item-variant {
-          margin: 0;
-          font-size: 0.85rem;
-          color: #7488A3;
-        }
-
-        .item-price {
-          margin: 0;
-          font-size: 0.9rem;
-          color: #2954C8;
-          font-weight: 500;
-        }
-
-        .item-actions {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 0.5rem;
-        }
-
-        .quantity-controls {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: #F5F8FE;
-          border-radius: 6px;
-          padding: 0.25rem;
-        }
-
-        .quantity-controls button {
-          width: 28px;
-          height: 28px;
-          border: none;
-          background: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: 600;
-          transition: background 0.2s;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .quantity-controls button:hover:not(:disabled) {
-          background: #E1E8F3;
-        }
-
-        .quantity-controls button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .item-total {
-          font-weight: 600;
-          color: #0B1739;
-          margin: 0;
-        }
-
-        .remove-button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          opacity: 0.6;
-          transition: opacity 0.2s;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          color: #7488A3;
-        }
-
-        .remove-button:hover {
-          opacity: 1;
-        }
-
-        .cart-footer {
-          padding: 1.5rem;
-          border-top: 1px solid #E1E8F3;
-          background: #F8FAFE;
-        }
-
-        .cart-total {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1rem;
-          font-size: 1.1rem;
-        }
-
-        .total-amount {
-          font-weight: 700;
-          color: #2954C8;
-          font-size: 1.25rem;
-        }
-
-        .checkout-button {
-          width: 100%;
-          padding: 1rem;
-          background: linear-gradient(135deg, #2954C8 0%, #2EA7FF 100%);
-          color: white;
-          border: none;
-          border-radius: 10px;
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .checkout-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
-        }
-
-        @media (max-width: 480px) {
-          .cart-sidebar {
-            max-width: 100%;
-          }
-
-          .cart-items {
-            padding: 0.75rem;
-          }
-
-          .cart-item {
-            grid-template-columns: 60px 1fr;
-            gap: 0.75rem;
-            padding: 0.875rem 0.75rem;
-          }
-
-          .item-image {
-            width: 60px;
-            height: 60px;
-          }
-
-          .item-title {
-            font-size: 0.92rem;
-          }
-
-          .item-variant,
-          .item-price {
-            font-size: 0.82rem;
-          }
-
-          .item-actions {
-            grid-column: span 2;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-          }
-        }
-      `}</style>
     </>
   );
 };

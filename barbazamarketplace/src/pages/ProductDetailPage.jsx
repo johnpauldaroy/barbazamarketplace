@@ -2,6 +2,17 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import {
+  ChevronRight,
+  Loader2,
+  Minus,
+  Package,
+  Plus,
+  ShoppingCart,
+  Star,
+  Store,
+  Tag,
+} from 'lucide-react';
+import {
   deleteMyProductReview,
   fetchMyProductReview,
   fetchProductById,
@@ -14,45 +25,39 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/use-toast';
 import { buildSimpleCartItem, resolveProductImage } from '../lib/marketplace';
 
-const defaultSummary = {
-  average_rating: 0,
-  ratings_count: 0,
-  breakdown: [],
+const defaultSummary = { average_rating: 0, ratings_count: 0, breakdown: [] };
+
+const fmtDate = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const formatReviewDate = (value) => {
-  if (!value) return 'Unknown date';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Unknown date';
-
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+const StarRow = ({ value = 0, interactive = false, onSelect = null, size = 'md' }) => {
+  const cls = size === 'sm' ? 'h-3.5 w-3.5' : 'h-5 w-5';
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => {
+        const v = i + 1;
+        return (
+          <button
+            key={v}
+            type="button"
+            disabled={!interactive}
+            onClick={interactive ? () => onSelect?.(v) : undefined}
+            className={`border-0 bg-transparent p-0 leading-none transition ${
+              v <= value ? 'text-amber-400' : 'text-slate-200'
+            } ${interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+            aria-label={interactive ? `Rate ${v}` : undefined}
+          >
+            <Star className={`${cls} ${v <= value ? 'fill-current' : ''}`} />
+          </button>
+        );
+      })}
+    </div>
+  );
 };
-
-const StarRow = ({ value = 0, interactive = false, onSelect = null }) => (
-  <div className="flex items-center gap-1">
-    {Array.from({ length: 5 }).map((_, index) => {
-      const starValue = index + 1;
-      return (
-        <button
-          key={`star-${starValue}`}
-          type="button"
-          onClick={interactive ? () => onSelect?.(starValue) : undefined}
-          className={`border-0 bg-transparent p-0 text-lg leading-none transition disabled:opacity-100 ${starValue <= value ? 'text-amber-400' : 'text-slate-300'} ${
-            interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'
-          }`}
-          aria-label={interactive ? `Set rating to ${starValue}` : undefined}
-          disabled={!interactive}
-        >
-          ★
-        </button>
-      );
-    })}
-  </div>
-);
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -65,6 +70,7 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addedToCart, setAddedToCart] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
 
   const [reviews, setReviews] = useState([]);
   const [reviewSummary, setReviewSummary] = useState(defaultSummary);
@@ -75,14 +81,11 @@ const ProductDetailPage = () => {
   const [myReview, setMyReview] = useState(null);
   const [canReview, setCanReview] = useState(false);
   const [loadingMyReview, setLoadingMyReview] = useState(false);
-  const [reviewForm, setReviewForm] = useState({
-    rating: 0,
-    comment: '',
-  });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
   const [savingReview, setSavingReview] = useState(false);
   const [deletingReview, setDeletingReview] = useState(false);
 
-  const [reportingReviewId, setReportingReviewId] = useState(null);
+  const [reportingId, setReportingId] = useState(null);
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [reporting, setReporting] = useState(false);
@@ -94,9 +97,8 @@ const ProductDetailPage = () => {
       const data = await fetchProductById(id);
       setProduct(data);
       setQuantity(1);
-    } catch (loadError) {
-      setError(loadError?.message || 'Failed to load product');
-      setProduct(null);
+    } catch (e) {
+      setError(e?.message || 'Failed to load product');
     } finally {
       setLoading(false);
     }
@@ -107,19 +109,13 @@ const ProductDetailPage = () => {
     setReviewsError('');
     try {
       const data = await fetchProductReviews(id, { page: 1, per_page: 10 });
-      const nextReviews = Array.isArray(data?.reviews) ? data.reviews : [];
-      const nextSummary = data?.summary || defaultSummary;
-      setReviews(nextReviews);
-      setReviewSummary({
-        ...defaultSummary,
-        ...nextSummary,
-        breakdown: Array.isArray(nextSummary?.breakdown) ? nextSummary.breakdown : [],
-      });
+      const r = Array.isArray(data?.reviews) ? data.reviews : [];
+      const s = data?.summary || defaultSummary;
+      setReviews(r);
+      setReviewSummary({ ...defaultSummary, ...s, breakdown: Array.isArray(s?.breakdown) ? s.breakdown : [] });
       setReviewsMeta(data?.meta || null);
-    } catch (loadError) {
-      setReviews([]);
-      setReviewsMeta(null);
-      setReviewsError(loadError?.message || 'Failed to load reviews');
+    } catch (e) {
+      setReviewsError(e?.message || 'Failed to load reviews');
       setReviewSummary(defaultSummary);
     } finally {
       setReviewsLoading(false);
@@ -127,117 +123,60 @@ const ProductDetailPage = () => {
   }, [id]);
 
   const loadMyReview = useCallback(async () => {
-    if (!isAuthenticated) {
-      setMyReview(null);
-      setCanReview(false);
-      setReviewForm({ rating: 0, comment: '' });
-      return;
-    }
-
+    if (!isAuthenticated) { setMyReview(null); setCanReview(false); return; }
     setLoadingMyReview(true);
     try {
       const data = await fetchMyProductReview(id);
-      const ownReview = data?.review || null;
-      setMyReview(ownReview);
+      const own = data?.review || null;
+      setMyReview(own);
       setCanReview(Boolean(data?.can_review));
-      setReviewForm({
-        rating: Number(ownReview?.rating || 0),
-        comment: ownReview?.comment || '',
-      });
-    } catch (_) {
+      setReviewForm({ rating: Number(own?.rating || 0), comment: own?.comment || '' });
+    } catch {
       setMyReview(null);
       setCanReview(false);
-      setReviewForm({ rating: 0, comment: '' });
     } finally {
       setLoadingMyReview(false);
     }
   }, [id, isAuthenticated]);
 
-  useEffect(() => {
-    loadProduct();
-  }, [loadProduct]);
+  useEffect(() => { loadProduct(); }, [loadProduct]);
+  useEffect(() => { loadReviews(); }, [loadReviews]);
+  useEffect(() => { loadMyReview(); }, [loadMyReview, user?.id]);
 
-  useEffect(() => {
-    loadReviews();
-  }, [loadReviews]);
+  const summaryRating = useMemo(() => Number(reviewSummary?.average_rating || product?.review_summary?.average_rating || 0), [reviewSummary, product]);
+  const summaryCount  = useMemo(() => Number(reviewSummary?.ratings_count  || product?.review_summary?.ratings_count  || 0), [reviewSummary, product]);
 
-  useEffect(() => {
-    loadMyReview();
-  }, [loadMyReview, user?.id]);
-
-  const summaryRating = useMemo(() => {
-    const fallback = Number(product?.review_summary?.average_rating || 0);
-    return Number(reviewSummary?.average_rating || fallback);
-  }, [product?.review_summary?.average_rating, reviewSummary?.average_rating]);
-
-  const summaryCount = useMemo(() => {
-    const fallback = Number(product?.review_summary?.ratings_count || 0);
-    return Number(reviewSummary?.ratings_count || fallback);
-  }, [product?.review_summary?.ratings_count, reviewSummary?.ratings_count]);
-
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-
-    const stockValue = Number(product.stock || 0);
-    const { product: cartProduct, variant } = buildSimpleCartItem(product);
-
-    addToCart(cartProduct, variant, quantity, stockValue)
-      .then(() => {
-        setAddedToCart(true);
-        setTimeout(() => setAddedToCart(false), 2000);
-      })
-      .catch((cartError) => {
-        toast({
-          title: 'Unable to add item',
-          description: cartError?.message || 'Please try again.',
-          variant: 'destructive',
-        });
-      });
+    setAddingToCart(true);
+    try {
+      const { product: cp, variant } = buildSimpleCartItem(product);
+      await addToCart(cp, variant, quantity, Number(product.stock || 0));
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 2500);
+    } catch (e) {
+      toast({ title: 'Unable to add item', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setAddingToCart(false);
+    }
   };
 
-  const handleReviewSubmit = async (event) => {
-    event.preventDefault();
-
-    if (reviewForm.rating < 1 || reviewForm.rating > 5) {
-      toast({
-        title: 'Rating required',
-        description: 'Please select a rating between 1 and 5 stars.',
-        variant: 'destructive',
-      });
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (reviewForm.rating < 1) {
+      toast({ title: 'Rating required', description: 'Select 1–5 stars.', variant: 'destructive' });
       return;
     }
-
     setSavingReview(true);
     try {
-      const response = await upsertProductReview(id, {
-        rating: reviewForm.rating,
-        comment: reviewForm.comment,
-      });
-      const savedReview = response?.review || null;
-      if (savedReview) {
-        setMyReview(savedReview);
-      }
-      if (response?.summary) {
-        setReviewSummary({
-          ...defaultSummary,
-          ...response.summary,
-          breakdown: Array.isArray(response.summary?.breakdown) ? response.summary.breakdown : [],
-        });
-      }
-
-      toast({
-        title: myReview ? 'Review updated' : 'Review added',
-        description: 'Your product review has been saved.',
-        variant: 'success',
-      });
+      const res = await upsertProductReview(id, { rating: reviewForm.rating, comment: reviewForm.comment });
+      if (res?.review) setMyReview(res.review);
+      if (res?.summary) setReviewSummary({ ...defaultSummary, ...res.summary, breakdown: Array.isArray(res.summary?.breakdown) ? res.summary.breakdown : [] });
+      toast({ title: myReview ? 'Review updated' : 'Review submitted', variant: 'success' });
       await loadReviews();
       await loadMyReview();
-    } catch (submitError) {
-      toast({
-        title: 'Unable to save review',
-        description: submitError?.message || 'Please try again.',
-        variant: 'destructive',
-      });
+    } catch (e) {
+      toast({ title: 'Could not save review', description: e?.message, variant: 'destructive' });
     } finally {
       setSavingReview(false);
     }
@@ -247,64 +186,34 @@ const ProductDetailPage = () => {
     if (!myReview) return;
     setDeletingReview(true);
     try {
-      const response = await deleteMyProductReview(id);
+      const res = await deleteMyProductReview(id);
       setMyReview(null);
       setReviewForm({ rating: 0, comment: '' });
-      if (response?.summary) {
-        setReviewSummary({
-          ...defaultSummary,
-          ...response.summary,
-          breakdown: Array.isArray(response.summary?.breakdown) ? response.summary.breakdown : [],
-        });
-      }
-
-      toast({
-        title: 'Review deleted',
-        description: 'Your review has been removed.',
-        variant: 'success',
-      });
+      if (res?.summary) setReviewSummary({ ...defaultSummary, ...res.summary, breakdown: Array.isArray(res.summary?.breakdown) ? res.summary.breakdown : [] });
+      toast({ title: 'Review deleted', variant: 'success' });
       await loadReviews();
       await loadMyReview();
-    } catch (deleteError) {
-      toast({
-        title: 'Unable to delete review',
-        description: deleteError?.message || 'Please try again.',
-        variant: 'destructive',
-      });
+    } catch (e) {
+      toast({ title: 'Could not delete review', description: e?.message, variant: 'destructive' });
     } finally {
       setDeletingReview(false);
     }
   };
 
-  const handleSubmitReport = async (reviewId) => {
-    const reason = reportReason.trim();
-    const details = reportDetails.trim();
-    if (reason === '') {
-      toast({
-        title: 'Reason required',
-        description: 'Please provide a report reason.',
-        variant: 'destructive',
-      });
+  const handleReport = async (reviewId) => {
+    if (!reportReason.trim()) {
+      toast({ title: 'Reason required', variant: 'destructive' });
       return;
     }
-
     setReporting(true);
     try {
-      await reportProductReview(reviewId, { reason, details: details || undefined });
-      toast({
-        title: 'Review reported',
-        description: 'Thanks. This review has been flagged for admin moderation.',
-        variant: 'success',
-      });
-      setReportingReviewId(null);
+      await reportProductReview(reviewId, { reason: reportReason.trim(), details: reportDetails.trim() || undefined });
+      toast({ title: 'Review reported', variant: 'success' });
+      setReportingId(null);
       setReportReason('');
       setReportDetails('');
-    } catch (reportError) {
-      toast({
-        title: 'Unable to report review',
-        description: reportError?.message || 'Please try again.',
-        variant: 'destructive',
-      });
+    } catch (e) {
+      toast({ title: 'Could not report review', description: e?.message, variant: 'destructive' });
     } finally {
       setReporting(false);
     }
@@ -312,314 +221,350 @@ const ProductDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="mx-auto flex min-h-[45vh] max-w-6xl items-center justify-center px-4 py-10 text-slate-500">
-        Loading product details...
+      <div className="section flex min-h-[50vh] items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-[#2954C8]" />
       </div>
     );
   }
 
-  if (error) {
+  if (error || !product) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold text-[#0b1739]">Unable to load product</h1>
-        <p className="mt-3 text-slate-500">{error}</p>
-        <Link to="/products" className="mt-6 inline-block rounded-lg bg-[#2954C8] px-4 py-2 text-white">
-          Back to Products
+      <div className="section py-16 text-center">
+        <p className="text-lg font-semibold text-[#0b1739]">{error || 'Product not found'}</p>
+        <Link to="/products" className="mt-4 inline-block rounded-lg bg-[#2954C8] px-5 py-2.5 text-sm font-semibold text-white">
+          Back to Marketplace
         </Link>
       </div>
     );
   }
 
-  if (!product) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold text-[#0b1739]">Product not found</h1>
-        <Link to="/products" className="mt-6 inline-block rounded-lg bg-[#2954C8] px-4 py-2 text-white">
-          Back to Products
-        </Link>
-      </div>
-    );
-  }
+  const stock = Number(product.stock || 0);
+  const imageUrl = resolveProductImage(product.image_url || product.image);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
       <Helmet>
-        <title>{product.title || product.name} - Barbaza MPC Marketplace</title>
+        <title>{product.title || product.name} — e-KoopMart</title>
       </Helmet>
 
-      <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Link to="/" className="hover:text-[#2954C8]">Home</Link>
-        <span>/</span>
-        <Link to="/products" className="hover:text-[#2954C8]">Products</Link>
-        <span>/</span>
-        <span className="font-medium text-[#0b1739]">{product.title || product.name}</span>
-      </nav>
-
-      <section className="grid gap-8 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-[#e3eaf6] bg-[#f6f9ff]">
-          {product.image_url || product.image ? (
-            <img
-              src={resolveProductImage(product.image_url || product.image)}
-              alt={product.title || product.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex min-h-[380px] items-center justify-center text-slate-400">
-              No image available
-            </div>
-          )}
+      {/* Breadcrumb */}
+      <div className="border-b border-[#dfe7f4] bg-white">
+        <div className="section py-4">
+          <nav className="flex items-center gap-1.5 text-xs text-slate-400">
+            <Link to="/" className="hover:text-[#2954C8]">Home</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link to="/products" className="hover:text-[#2954C8]">Marketplace</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-medium text-slate-600 clamp-1">{product.title || product.name}</span>
+          </nav>
         </div>
+      </div>
 
-        <div className="space-y-5">
-          <div>
-            <span className="inline-flex rounded-full bg-[#2954C8] px-3 py-1 text-xs font-medium text-white">
-              {product.category || 'General'}
-            </span>
-            <h1 className="mt-3 text-3xl font-bold text-[#0b1739]">{product.title || product.name}</h1>
+      <div className="section py-8">
+        {/* Product section */}
+        <div className="grid gap-8 lg:grid-cols-[1fr_480px] xl:grid-cols-[1fr_520px]">
+          {/* Image */}
+          <div className="overflow-hidden rounded-xl border border-[#dfe7f4] bg-[#f4f7fd]">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={product.title || product.name}
+                className="h-full max-h-[520px] w-full object-contain p-4"
+              />
+            ) : (
+              <div className="flex min-h-[340px] items-center justify-center text-slate-400">
+                <Package className="h-12 w-12 opacity-40" />
+              </div>
+            )}
           </div>
 
-          <div className="rounded-xl border border-[#e3eaf6] bg-white p-4">
-            <p className="text-3xl font-bold text-[#2954C8]">PHP {Number(product.price || 0).toFixed(2)}</p>
-            <div className="mt-3 flex items-center gap-3">
-              <StarRow value={Math.round(summaryRating)} />
-              <p className="text-sm text-slate-600">
-                {summaryCount > 0 ? `${summaryRating.toFixed(1)} (${summaryCount} reviews)` : 'No reviews yet'}
+          {/* Details */}
+          <div className="space-y-5">
+            <div>
+              {product.category && (
+                <span className="badge-blue mb-2 inline-flex items-center gap-1">
+                  <Tag className="h-3 w-3" />
+                  {product.category}
+                </span>
+              )}
+              <h1 className="text-2xl font-bold text-[#0b1739] sm:text-3xl">
+                {product.title || product.name}
+              </h1>
+              {product?.store && (
+                <div className="mt-2 flex items-center gap-1.5 text-sm text-slate-500">
+                  <Store className="h-4 w-4" />
+                  {product?.store?.slug ? (
+                    <Link to={`/stores/${product.store.slug}`} className="font-medium text-[#2954C8] hover:underline">
+                      {product.store.name}
+                    </Link>
+                  ) : (
+                    <span>{product?.store?.name || 'Platform Store'}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Rating */}
+            {summaryCount > 0 && (
+              <div className="flex items-center gap-2">
+                <StarRow value={Math.round(summaryRating)} />
+                <span className="text-sm text-slate-500">
+                  {summaryRating.toFixed(1)} ({summaryCount} {summaryCount === 1 ? 'review' : 'reviews'})
+                </span>
+              </div>
+            )}
+
+            {/* Price */}
+            <div className="rounded-xl border border-[#dfe7f4] bg-white p-5">
+              <p className="text-3xl font-extrabold text-[#0b1739]">
+                PHP {Number(product.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+              <p className={`mt-1.5 text-sm font-medium ${stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {stock > 0 ? `In stock · ${stock} available` : 'Out of stock'}
               </p>
             </div>
-            <p className={`mt-3 text-sm ${Number(product.stock || 0) > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {Number(product.stock || 0) > 0 ? `In stock (${product.stock} available)` : 'Out of stock'}
-            </p>
-          </div>
 
-          <p className="text-slate-600">{product.description || 'No description provided.'}</p>
+            {/* Description */}
+            {product.description && (
+              <p className="text-sm leading-relaxed text-slate-600">{product.description}</p>
+            )}
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="inline-flex items-center overflow-hidden rounded-lg border border-[#d7e2f1] bg-white">
-              <button
-                type="button"
-                onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-                disabled={quantity <= 1}
-                className="h-11 w-11 text-lg text-slate-600 disabled:opacity-40"
-              >
-                -
-              </button>
-              <span className="inline-flex min-w-[44px] justify-center px-2 font-semibold text-[#0b1739]">{quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity((value) => Math.min(Number(product.stock || 0), value + 1))}
-                disabled={quantity >= Number(product.stock || 0)}
-                className="h-11 w-11 text-lg text-slate-600 disabled:opacity-40"
-              >
-                +
-              </button>
-            </div>
-
-            <button
-              type="button"
-              className={`rounded-lg px-5 py-3 font-semibold text-white ${
-                addedToCart ? 'bg-emerald-600' : 'bg-[#2954C8] hover:bg-[#1f44a5]'
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-              onClick={handleAddToCart}
-              disabled={Number(product.stock || 0) === 0 || addedToCart}
-            >
-              {addedToCart ? 'Added to Cart!' : 'Add to Cart'}
-            </button>
-          </div>
-
-          <div className="space-y-2 border-t border-[#e3eaf6] pt-4 text-sm text-slate-600">
-            <p>
-              Category: <span className="font-medium text-[#0b1739]">{product.category || 'General'}</span>
-            </p>
-            <p>
-              Store:{' '}
-              {product?.store?.slug ? (
-                <Link to={`/stores/${product.store.slug}`} className="font-medium text-[#2954C8] hover:underline">
-                  {product.store?.name || 'Platform Store'}
-                </Link>
-              ) : (
-                <span className="font-medium text-[#0b1739]">{product?.store?.name || 'Platform Store'}</span>
-              )}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5 rounded-2xl border border-[#e3eaf6] bg-white p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-[#0b1739]">Ratings and Reviews</h2>
-            <p className="text-sm text-slate-500">
-              {summaryCount > 0 ? `${summaryRating.toFixed(1)} average from ${summaryCount} reviews` : 'No reviews yet'}
-            </p>
-          </div>
-
-          {reviewSummary.breakdown?.length > 0 ? (
-            <div className="grid gap-2 sm:max-w-md">
-              {reviewSummary.breakdown.map((row) => {
-                const count = Number(row?.count || 0);
-                const percent = summaryCount > 0 ? Math.round((count / summaryCount) * 100) : 0;
-                return (
-                  <div key={`breakdown-${row.rating}`} className="grid grid-cols-[48px_minmax(0,1fr)_42px] items-center gap-2 text-sm text-slate-600">
-                    <span>{row.rating}★</span>
-                    <div className="h-2 rounded bg-slate-100">
-                      <div className="h-2 rounded bg-[#2954C8]" style={{ width: `${percent}%` }} />
-                    </div>
-                    <span className="text-right">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {reviewsLoading ? (
-            <p className="text-sm text-slate-500">Loading reviews...</p>
-          ) : reviewsError ? (
-            <p className="text-sm text-rose-600">{reviewsError}</p>
-          ) : reviews.length === 0 ? (
-            <p className="text-sm text-slate-500">No published reviews for this product yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {reviews.map((review) => {
-                const isOwnReview = myReview?.id === review.id;
-                return (
-                  <article key={review.id} className="rounded-xl border border-[#e3eaf6] bg-[#fcfdff] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-[#0b1739]">{review.reviewer_name || 'Verified Buyer'}</p>
-                        <p className="text-xs text-slate-500">{formatReviewDate(review.created_at)}</p>
-                      </div>
-                      <StarRow value={Number(review.rating || 0)} />
-                    </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-slate-600">
-                      {review.comment?.trim() || 'No written comment provided.'}
-                    </p>
-
-                    {isAuthenticated && !isOwnReview ? (
-                      <div className="mt-4 border-t border-[#e9eff9] pt-3">
-                        {reportingReviewId !== review.id ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReportingReviewId(review.id);
-                              setReportReason('');
-                              setReportDetails('');
-                            }}
-                            className="text-xs font-semibold text-[#2954C8] hover:underline"
-                          >
-                            Report review
-                          </button>
-                        ) : (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={reportReason}
-                              onChange={(event) => setReportReason(event.target.value)}
-                              placeholder="Reason (required)"
-                              className="h-10 w-full rounded-lg border border-[#d7e2f1] px-3 text-sm outline-none focus:border-[#2954C8]"
-                            />
-                            <textarea
-                              value={reportDetails}
-                              onChange={(event) => setReportDetails(event.target.value)}
-                              placeholder="Details (optional)"
-                              rows={2}
-                              className="w-full rounded-lg border border-[#d7e2f1] px-3 py-2 text-sm outline-none focus:border-[#2954C8]"
-                            />
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleSubmitReport(review.id)}
-                                disabled={reporting}
-                                className="rounded-md bg-[#2954C8] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                              >
-                                {reporting ? 'Submitting...' : 'Submit report'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setReportingReviewId(null)}
-                                className="rounded-md border border-[#d7e2f1] px-3 py-2 text-xs font-semibold text-slate-600"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-              {reviewsMeta?.total > reviews.length ? (
-                <p className="text-xs text-slate-500">
-                  Showing {reviews.length} of {reviewsMeta.total} reviews.
-                </p>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        <aside className="h-fit rounded-2xl border border-[#e3eaf6] bg-white p-5 sm:p-6">
-          <h3 className="text-xl font-bold text-[#0b1739]">Your Review</h3>
-
-          {!isAuthenticated ? (
-            <p className="mt-3 text-sm text-slate-500">
-              <Link to="/login" className="font-semibold text-[#2954C8] hover:underline">
-                Sign in
-              </Link>{' '}
-              to review this product after a delivered purchase.
-            </p>
-          ) : loadingMyReview ? (
-            <p className="mt-3 text-sm text-slate-500">Checking review eligibility...</p>
-          ) : !canReview ? (
-            <p className="mt-3 text-sm text-slate-500">Available after delivered purchase.</p>
-          ) : (
-            <form onSubmit={handleReviewSubmit} className="mt-4 space-y-4">
-              <div>
-                <p className="mb-2 text-sm font-medium text-[#0b1739]">Rating *</p>
-                <StarRow
-                  value={reviewForm.rating}
-                  interactive
-                  onSelect={(rating) => setReviewForm((current) => ({ ...current, rating }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#0b1739]" htmlFor="review-comment">
-                  Comment (optional)
-                </label>
-                <textarea
-                  id="review-comment"
-                  value={reviewForm.comment}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, comment: event.target.value }))}
-                  rows={4}
-                  maxLength={2000}
-                  placeholder="Share your experience with this product."
-                  className="w-full rounded-lg border border-[#d7e2f1] px-3 py-2 text-sm outline-none focus:border-[#2954C8]"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingReview}
-                className="w-full rounded-lg bg-[#2954C8] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {savingReview ? 'Saving...' : myReview ? 'Update review' : 'Submit review'}
-              </button>
-
-              {myReview ? (
+            {/* Qty + Add to Cart */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center overflow-hidden rounded-lg border border-[#dfe7f4] bg-white">
                 <button
                   type="button"
-                  onClick={handleReviewDelete}
-                  disabled={deletingReview}
-                  className="w-full rounded-lg border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 disabled:opacity-60"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                  className="flex h-11 w-11 items-center justify-center text-slate-600 transition hover:bg-[#f4f7fd] disabled:opacity-40"
                 >
-                  {deletingReview ? 'Deleting...' : 'Delete my review'}
+                  <Minus className="h-4 w-4" />
                 </button>
-              ) : null}
-            </form>
-          )}
-        </aside>
-      </section>
-    </div>
+                <span className="min-w-[44px] text-center text-sm font-semibold text-[#0b1739]">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
+                  disabled={quantity >= stock}
+                  className="flex h-11 w-11 items-center justify-center text-slate-600 transition hover:bg-[#f4f7fd] disabled:opacity-40"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={stock === 0 || addedToCart || addingToCart}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed ${
+                  addedToCart
+                    ? 'bg-green-600'
+                    : 'bg-[#2954C8] hover:bg-[#1f44a5] disabled:bg-slate-300'
+                }`}
+              >
+                {addingToCart ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShoppingCart className="h-4 w-4" />
+                )}
+                {addedToCart ? 'Added to cart!' : addingToCart ? 'Adding...' : 'Add to cart'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Reviews */}
+        <div className="mt-10 grid gap-6 xl:grid-cols-[1fr_360px]">
+          {/* Reviews list */}
+          <div className="rounded-xl border border-[#dfe7f4] bg-white p-6">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-bold text-[#0b1739]">
+                Ratings &amp; Reviews
+                {summaryCount > 0 && (
+                  <span className="ml-2 text-sm font-normal text-slate-400">
+                    ({summaryCount})
+                  </span>
+                )}
+              </h2>
+              {summaryCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-[#0b1739]">{summaryRating.toFixed(1)}</span>
+                  <StarRow value={Math.round(summaryRating)} size="sm" />
+                </div>
+              )}
+            </div>
+
+            {/* Rating breakdown */}
+            {reviewSummary.breakdown?.length > 0 && (
+              <div className="mb-5 space-y-2 sm:max-w-sm">
+                {reviewSummary.breakdown.map((row) => {
+                  const pct = summaryCount > 0 ? Math.round((Number(row?.count || 0) / summaryCount) * 100) : 0;
+                  return (
+                    <div key={row.rating} className="grid grid-cols-[40px_1fr_36px] items-center gap-2 text-xs text-slate-500">
+                      <span>{row.rating}★</span>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-[#2954C8]" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-right">{row.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {reviewsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading reviews...
+              </div>
+            ) : reviewsError ? (
+              <p className="text-sm text-red-500">{reviewsError}</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-slate-400">No reviews yet. Be the first to review!</p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((review) => {
+                  const isOwn = myReview?.id === review.id;
+                  return (
+                    <article key={review.id} className="rounded-lg border border-[#dfe7f4] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-[#0b1739]">
+                            {review.reviewer_name || 'Verified Buyer'}
+                          </p>
+                          <p className="text-xs text-slate-400">{fmtDate(review.created_at)}</p>
+                        </div>
+                        <StarRow value={Number(review.rating || 0)} size="sm" />
+                      </div>
+                      {review.comment?.trim() && (
+                        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                          {review.comment.trim()}
+                        </p>
+                      )}
+                      {isAuthenticated && !isOwn && (
+                        <div className="mt-3 border-t border-[#f0f4fc] pt-2">
+                          {reportingId !== review.id ? (
+                            <button
+                              type="button"
+                              onClick={() => { setReportingId(review.id); setReportReason(''); setReportDetails(''); }}
+                              className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              Report
+                            </button>
+                          ) : (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={reportReason}
+                                onChange={(e) => setReportReason(e.target.value)}
+                                placeholder="Reason (required)"
+                                className="h-9 w-full rounded-lg border border-[#dfe7f4] px-3 text-sm outline-none focus:border-[#2954C8]"
+                              />
+                              <textarea
+                                value={reportDetails}
+                                onChange={(e) => setReportDetails(e.target.value)}
+                                placeholder="Details (optional)"
+                                rows={2}
+                                className="w-full rounded-lg border border-[#dfe7f4] px-3 py-2 text-sm outline-none focus:border-[#2954C8]"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReport(review.id)}
+                                  disabled={reporting}
+                                  className="rounded-lg bg-[#2954C8] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                                >
+                                  {reporting ? 'Submitting...' : 'Submit'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setReportingId(null)}
+                                  className="rounded-lg border border-[#dfe7f4] px-3 py-1.5 text-xs font-semibold text-slate-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+                {reviewsMeta?.total > reviews.length && (
+                  <p className="text-xs text-slate-400">
+                    Showing {reviews.length} of {reviewsMeta.total} reviews
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Write a review */}
+          <aside className="h-fit rounded-xl border border-[#dfe7f4] bg-white p-6">
+            <h3 className="mb-4 text-base font-bold text-[#0b1739]">Write a review</h3>
+            {!isAuthenticated ? (
+              <p className="text-sm text-slate-500">
+                <Link to="/login" className="font-semibold text-[#2954C8] hover:underline">Sign in</Link>
+                {' '}to review after a delivered purchase.
+              </p>
+            ) : loadingMyReview ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking eligibility...
+              </div>
+            ) : !canReview ? (
+              <p className="text-sm text-slate-500">Available after a delivered purchase.</p>
+            ) : (
+              <form onSubmit={handleReviewSubmit} className="space-y-4">
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Your rating *
+                  </p>
+                  <StarRow
+                    value={reviewForm.rating}
+                    interactive
+                    onSelect={(r) => setReviewForm((f) => ({ ...f, rating: r }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="review-comment" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Comment (optional)
+                  </label>
+                  <textarea
+                    id="review-comment"
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
+                    rows={4}
+                    maxLength={2000}
+                    placeholder="Share your experience..."
+                    className="w-full rounded-lg border border-[#dfe7f4] px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/10"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={savingReview}
+                  className="w-full rounded-lg bg-[#2954C8] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f44a5] disabled:opacity-60"
+                >
+                  {savingReview ? 'Saving...' : myReview ? 'Update review' : 'Submit review'}
+                </button>
+                {myReview && (
+                  <button
+                    type="button"
+                    onClick={handleReviewDelete}
+                    disabled={deletingReview}
+                    className="w-full rounded-lg border border-red-200 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {deletingReview ? 'Deleting...' : 'Delete my review'}
+                  </button>
+                )}
+              </form>
+            )}
+          </aside>
+        </div>
+      </div>
+    </>
   );
 };
 

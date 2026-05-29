@@ -94,26 +94,26 @@ const StoresPage = () => {
         />
       </Helmet>
 
-      <section className="border-b border-white/60">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <section className="border-b border-[#dfe7f4] bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <Badge variant="secondary">Store directory</Badge>
-          <h1 className="mt-4 text-4xl font-bold text-[#0b1739] sm:text-5xl">
-            Discover merchant stores across the marketplace.
+          <h1 className="mt-3 text-2xl font-bold text-[#0b1739] sm:text-3xl lg:text-4xl">
+            Discover merchant stores
           </h1>
-          <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-500 sm:text-base">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
             Open a store page to view products, business details, and contact information for direct inquiries.
           </p>
 
-          <div className="relative mt-8 max-w-xl">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="relative mt-6 max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search by store name, city, or description"
-              className="pl-11"
+              className="h-11 pl-10"
             />
           </div>
-          <p className="mt-3 text-sm text-slate-500">{storeCountLabel}</p>
+          <p className="mt-2.5 text-sm text-slate-500">{storeCountLabel}</p>
         </div>
       </section>
 

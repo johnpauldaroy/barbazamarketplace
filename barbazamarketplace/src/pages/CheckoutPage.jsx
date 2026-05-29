@@ -1,415 +1,323 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { motion } from 'framer-motion';
-import { CreditCard, Smartphone, ArrowLeft, Store } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/button';
-import { Label } from '../components/ui/label';
+import { ArrowLeft, ChevronRight, CreditCard, ImageIcon, Smartphone, Store } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/ui/use-toast';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { createOrder } from '../api/EcommerceApi';
+
+const fmt = (cents) =>
+  `PHP ${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const PAYMENT_METHODS = [
+  { value: 'qrph', label: 'QRPH / GCash / Maya', icon: Smartphone, desc: 'Scan QR code and upload your payment reference.' },
+  { value: 'cod', label: 'Cash on Delivery', icon: Store, desc: 'Pay in cash when your order arrives.' },
+  { value: 'pickup', label: 'Store Pickup (no shipping fee)', icon: CreditCard, desc: 'Pick up at Barbaza MPC office. No shipping fee.' },
+];
+
+const Field = ({ label, id, required, children }) => (
+  <div>
+    <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-[#0b1739]">
+      {label}{required && <span className="ml-0.5 text-red-500">*</span>}
+    </label>
+    {children}
+  </div>
+);
+
+const inputCls = 'h-11 w-full rounded-lg border border-[#dfe7f4] bg-[#f8fafd] px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#2954C8] focus:bg-white focus:ring-2 focus:ring-[#2954C8]/10';
 
 const CheckoutPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { cartItems, clearCart } = useCart();
   const { user, loading: authLoading } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    paymentMethod: 'qrph',
-    paymentReference: ''
-  });
+  const [submitting, setSubmitting] = useState(false);
 
-  const getItemPriceInCents = (item) => item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
-  const subtotalInCents = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + (getItemPriceInCents(item) * item.quantity), 0);
-  }, [cartItems]);
-  const shippingFeeInCents = cartItems.length > 0 && formData.paymentMethod !== 'pickup' ? 5000 : 0;
-  const totalInCents = subtotalInCents + shippingFeeInCents;
-  const formatPeso = (amountInCents) => `PHP ${(amountInCents / 100).toFixed(2)}`;
+  const [form, setForm] = useState({
+    fullName: '', email: '', phone: '',
+    address: '', city: '',
+    paymentMethod: 'qrph',
+    paymentReference: '',
+  });
 
   useEffect(() => {
     if (!user) return;
-    setFormData((current) => ({
-      ...current,
-      fullName: current.fullName || user.name || '',
-      email: current.email || user.email || '',
+    setForm((f) => ({
+      ...f,
+      fullName: f.fullName || user.name || '',
+      email: f.email || user.email || '',
     }));
   }, [user]);
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const getUnitCents = (item) => item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
+  const subtotal = useMemo(() => cartItems.reduce((s, i) => s + getUnitCents(i) * i.quantity, 0), [cartItems]);
+  const shipping = cartItems.length > 0 && form.paymentMethod !== 'pickup' ? 5000 : 0;
+  const total = subtotal + shipping;
+
+  const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.address || !formData.city) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive'
-      });
+    const { fullName, email, phone, address, city, paymentMethod, paymentReference } = form;
+    if (!fullName || !email || !phone || !address || !city) {
+      toast({ title: 'Missing information', description: 'Please fill in all required fields.', variant: 'destructive' });
       return;
     }
-
-    if (formData.paymentMethod === 'qrph' && !formData.paymentReference.trim()) {
-      toast({
-        title: 'Payment Reference Required',
-        description: 'Please enter the QRPH payment reference number.',
-        variant: 'destructive'
-      });
+    if (paymentMethod === 'qrph' && !paymentReference.trim()) {
+      toast({ title: 'Payment reference required', description: 'Enter the QRPH reference number.', variant: 'destructive' });
       return;
     }
-
     if (authLoading) {
-      toast({
-        title: 'Please wait',
-        description: 'Finishing sign-in check. Try again in a moment.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Please wait', description: 'Verifying session…', variant: 'destructive' });
       return;
     }
+    if (cartItems.length === 0) { navigate('/products'); return; }
 
-    if (cartItems.length === 0) {
-      toast({
-        title: 'Cart Empty',
-        description: 'Please add items to your cart before checking out.',
-        variant: 'destructive'
-      });
-      navigate('/products');
-      return;
-    }
-
-    const orderPayload = {
-      items: cartItems.map((item) => {
-        const unitPriceInCents = getItemPriceInCents(item);
-        return {
+    setSubmitting(true);
+    try {
+      const payload = {
+        items: cartItems.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
-          price: Number((unitPriceInCents / 100).toFixed(2))
-        };
-      }),
-      total_amount: Number((totalInCents / 100).toFixed(2)),
-      subtotal_amount: Number((subtotalInCents / 100).toFixed(2)),
-      shipping_fee: Number((shippingFeeInCents / 100).toFixed(2)),
-      shipping_address: formData.address,
-      shipping_city: formData.city,
-      customer_name: formData.fullName,
-      customer_email: formData.email,
-      customer_phone: formData.phone,
-      payment_method: formData.paymentMethod,
-      payment_reference: formData.paymentReference || null,
-      customer: {
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        paymentMethod: formData.paymentMethod,
-      },
-    };
-
-    setIsSubmitting(true);
-    try {
-      const createdOrder = await createOrder(orderPayload);
+          price: Number((getUnitCents(item) / 100).toFixed(2)),
+        })),
+        total_amount: Number((total / 100).toFixed(2)),
+        subtotal_amount: Number((subtotal / 100).toFixed(2)),
+        shipping_fee: Number((shipping / 100).toFixed(2)),
+        shipping_address: address,
+        shipping_city: city,
+        customer_name: fullName,
+        customer_email: email,
+        customer_phone: phone,
+        payment_method: paymentMethod,
+        payment_reference: paymentReference || null,
+        customer: { fullName, email, phone, paymentMethod },
+      };
+      const created = await createOrder(payload);
       clearCart();
-      toast({
-        title: 'Order Placed!',
-        description: 'Your order has been successfully submitted.',
-      });
-      navigate('/order-confirmation', { state: { order: createdOrder?.order || createdOrder } });
-    } catch (error) {
-      toast({
-        title: 'Checkout Failed',
-        description: error?.message || 'Unable to place the order right now.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Order placed!', description: 'Your order has been submitted successfully.' });
+      navigate('/order-confirmation', { state: { order: created?.order || created } });
+    } catch (err) {
+      toast({ title: 'Checkout failed', description: err?.message || 'Unable to place order. Please try again.', variant: 'destructive' });
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F4F7FD] py-8">
-        <Helmet>
-          <title>Checkout - Barbaza MPC</title>
-          <meta name="description" content="Complete your order checkout at Barbaza MPC marketplace" />
-        </Helmet>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Button
-            onClick={() => navigate('/products')}
-            variant="ghost"
-            className="mb-6 text-[#2954C8] hover:text-[#12B981]"
-          >
-            <ArrowLeft className="mr-2 w-4 h-4" /> Back to Products
-          </Button>
-          <div className="bg-white rounded-xl shadow-md p-8 text-center">
-            <h1 className="text-2xl font-bold text-[#0B1739]">Your cart is empty</h1>
-            <p className="text-gray-600 mt-2">Add items to your cart before checking out.</p>
-          </div>
-        </div>
+      <div className="section flex flex-col items-center gap-5 py-20 text-center">
+        <Helmet><title>Checkout — e-KoopMart</title></Helmet>
+        <p className="text-lg font-bold text-[#0b1739]">Your cart is empty</p>
+        <Link to="/products" className="rounded-lg bg-[#2954C8] px-5 py-2.5 text-sm font-semibold text-white">
+          Browse marketplace
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FD] py-8">
+    <>
       <Helmet>
-        <title>Checkout - Barbaza MPC</title>
-        <meta name="description" content="Complete your order checkout at Barbaza MPC marketplace" />
+        <title>Checkout — e-KoopMart</title>
+        <meta name="description" content="Complete your order at e-KoopMart" />
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Button
-          onClick={() => navigate('/cart')}
-          variant="ghost"
-          className="mb-6 text-[#2954C8] hover:text-[#12B981]"
-        >
-          <ArrowLeft className="mr-2 w-4 h-4" /> Back to Cart
-        </Button>
+      {/* Page header */}
+      <div className="border-b border-[#dfe7f4] bg-white">
+        <div className="section py-6">
+          <nav className="mb-2 flex items-center gap-1.5 text-xs text-slate-400">
+            <Link to="/" className="hover:text-[#2954C8]">Home</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link to="/cart" className="hover:text-[#2954C8]">Cart</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-medium text-slate-600">Checkout</span>
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link to="/cart" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#2954C8]">
+              <ArrowLeft className="h-4 w-4" />
+              Back to cart
+            </Link>
+          </div>
+          <h1 className="mt-2 text-2xl font-bold text-[#0b1739]">Checkout</h1>
+        </div>
+      </div>
 
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#0B1739] mb-8">Checkout</h1>
-
+      <div className="section py-8">
         <form onSubmit={handleSubmit}>
-          <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
-              >
-                <h2 className="text-xl font-bold text-[#0B1739] mb-6">Contact Information</h2>
+          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+            {/* Form sections */}
+            <div className="space-y-5">
+              {/* Contact info */}
+              <div className="rounded-xl border border-[#dfe7f4] bg-white p-6">
+                <h2 className="mb-5 text-base font-bold text-[#0b1739]">Contact Information</h2>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="fullName" className="text-[#0B1739]">Full Name *</Label>
+                  <Field label="Full name" id="fullName" required>
                     <input
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#12B981] focus:border-transparent outline-none"
-                      required
+                      id="fullName" name="fullName" type="text" required
+                      value={form.fullName} onChange={handleChange}
+                      className={inputCls} placeholder="Juan dela Cruz"
                     />
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="email" className="text-[#0B1739]">Email *</Label>
+                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Email address" id="email" required>
                       <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#12B981] focus:border-transparent outline-none"
-                        required
+                        id="email" name="email" type="email" required
+                        value={form.email} onChange={handleChange}
+                        className={inputCls} placeholder="you@example.com"
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="phone" className="text-[#0B1739]">Phone Number *</Label>
+                    </Field>
+                    <Field label="Phone number" id="phone" required>
                       <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#12B981] focus:border-transparent outline-none"
-                        required
+                        id="phone" name="phone" type="tel" required
+                        value={form.phone} onChange={handleChange}
+                        className={inputCls} placeholder="09XX XXX XXXX"
                       />
-                    </div>
+                    </Field>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
-              >
-                <h2 className="text-xl font-bold text-[#0B1739] mb-6">Shipping Address</h2>
+              {/* Shipping address */}
+              <div className="rounded-xl border border-[#dfe7f4] bg-white p-6">
+                <h2 className="mb-5 text-base font-bold text-[#0b1739]">Delivery Address</h2>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="address" className="text-[#0B1739]">Street Address *</Label>
+                  <Field label="Street address" id="address" required>
                     <input
-                      type="text"
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#12B981] focus:border-transparent outline-none"
-                      required
+                      id="address" name="address" type="text" required
+                      value={form.address} onChange={handleChange}
+                      className={inputCls} placeholder="House no., street, barangay"
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="city" className="text-[#0B1739]">City/Municipality *</Label>
+                  </Field>
+                  <Field label="City / Municipality" id="city" required>
                     <input
-                      type="text"
-                      id="city"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#12B981] focus:border-transparent outline-none"
-                      required
+                      id="city" name="city" type="text" required
+                      value={form.city} onChange={handleChange}
+                      className={inputCls} placeholder="Barbaza, Antique"
                     />
-                  </div>
+                  </Field>
                 </div>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white rounded-xl shadow-md p-4 sm:p-6"
-              >
-                <h2 className="text-xl font-bold text-[#0B1739] mb-6">Payment Method</h2>
+              {/* Payment method */}
+              <div className="rounded-xl border border-[#dfe7f4] bg-white p-6">
+                <h2 className="mb-5 text-base font-bold text-[#0b1739]">Payment Method</h2>
                 <div className="space-y-3">
-                  <label
-                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      formData.paymentMethod === 'qrph'
-                        ? 'border-[#12B981] bg-emerald-50/40'
-                        : 'border-gray-200 hover:border-[#12B981]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="qrph"
-                      checked={formData.paymentMethod === 'qrph'}
-                      onChange={handleInputChange}
-                      className="w-5 h-5 text-[#12B981] shrink-0"
-                    />
-                    <Smartphone className="w-5 h-5 text-[#12B981] shrink-0" />
-                    <span className="font-medium text-[#0B1739]">QRPH Scan to Pay</span>
-                  </label>
-                  <label
-                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      formData.paymentMethod === 'cod'
-                        ? 'border-[#12B981] bg-emerald-50/40'
-                        : 'border-gray-200 hover:border-[#12B981]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="cod"
-                      checked={formData.paymentMethod === 'cod'}
-                      onChange={handleInputChange}
-                      className="w-5 h-5 text-[#12B981] shrink-0"
-                    />
-                    <CreditCard className="w-5 h-5 text-[#12B981] shrink-0" />
-                    <span className="font-medium text-[#0B1739]">Cash on Delivery</span>
-                  </label>
-
-                  <label
-                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      formData.paymentMethod === 'pickup'
-                        ? 'border-[#12B981] bg-emerald-50/40'
-                        : 'border-gray-200 hover:border-[#12B981]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="pickup"
-                      checked={formData.paymentMethod === 'pickup'}
-                      onChange={handleInputChange}
-                      className="w-5 h-5 text-[#12B981] shrink-0"
-                    />
-                    <Store className="w-5 h-5 text-[#12B981] shrink-0" />
-                    <span className="font-medium text-[#0B1739]">Pick up</span>
-                  </label>
-                </div>
-
-                {formData.paymentMethod === 'qrph' && (
-                  <div className="mt-6 border border-dashed border-gray-200 rounded-lg p-4 bg-[#F7FAFC]">
-                    <p className="text-sm font-semibold text-[#0B1739] mb-3">Scan QRPH to Pay</p>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="w-32 h-32 bg-white border border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-400">
-                        QRPH CODE
+                  {PAYMENT_METHODS.map(({ value, label, icon: Icon, desc }) => (
+                    <label
+                      key={value}
+                      className={`flex cursor-pointer items-start gap-3.5 rounded-xl border-2 p-4 transition-colors ${
+                        form.paymentMethod === value
+                          ? 'border-[#2954C8] bg-[#eef3fb]'
+                          : 'border-[#dfe7f4] hover:border-[#2954C8]/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={value}
+                        checked={form.paymentMethod === value}
+                        onChange={handleChange}
+                        className="mt-0.5 accent-[#2954C8]"
+                      />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+                        <Icon className="h-5 w-5 text-[#2954C8]" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-600 mb-2">
-                          Scan the QRPH code with your banking app and enter the reference number after payment.
-                        </p>
-                        <Label htmlFor="paymentReference" className="text-[#0B1739]">Reference Number *</Label>
+                      <div>
+                        <p className="text-sm font-semibold text-[#0b1739]">{label}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{desc}</p>
+                      </div>
+                    </label>
+                  ))}
+
+                  {form.paymentMethod === 'qrph' && (
+                    <div className="mt-3">
+                      <Field label="Payment reference number" id="paymentReference" required>
                         <input
-                          type="text"
                           id="paymentReference"
                           name="paymentReference"
-                          value={formData.paymentReference}
-                          onChange={handleInputChange}
-                          className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#12B981] outline-none"
-                          placeholder="Enter QRPH reference"
-                          required
+                          type="text"
+                          value={form.paymentReference}
+                          onChange={handleChange}
+                          className={inputCls}
+                          placeholder="e.g. GCash transaction ID"
                         />
-                      </div>
+                      </Field>
                     </div>
-                  </div>
-                )}
-              </motion.div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="lg:col-span-1">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:sticky lg:top-24"
-              >
-                <h2 className="text-xl font-bold text-[#0B1739] mb-6">Order Summary</h2>
+            {/* Order summary sticky sidebar */}
+            <div className="lg:sticky lg:top-[110px] h-fit space-y-4">
+              <div className="rounded-xl border border-[#dfe7f4] bg-white p-6">
+                <h2 className="mb-4 text-base font-bold text-[#0b1739]">
+                  Order Summary
+                  <span className="ml-2 text-sm font-normal text-slate-400">
+                    ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)
+                  </span>
+                </h2>
 
-                <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
+                <ul className="space-y-3 divide-y divide-[#f0f4fc]">
                   {cartItems.map((item) => (
-                    <div key={item.variant.id} className="flex items-start justify-between gap-3 text-sm">
-                      <span className="text-gray-600 min-w-0 break-words">
-                        {item.product.title} x {item.quantity}
-                      </span>
-                      <span className="font-semibold shrink-0">{formatPeso(getItemPriceInCents(item) * item.quantity)}</span>
-                    </div>
+                    <li key={item.variant.id} className="flex items-center gap-3 pt-3 first:pt-0">
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd]">
+                        {item.product.thumbnail_url ? (
+                          <img src={item.product.thumbnail_url} alt={item.product.title} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-slate-300">
+                            <ImageIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="clamp-1 text-xs font-semibold text-[#0b1739]">{item.product.title}</p>
+                        <p className="text-[11px] text-slate-400">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="text-xs font-bold text-[#0b1739] shrink-0">
+                        {fmt(getUnitCents(item) * item.quantity)}
+                      </p>
+                    </li>
                   ))}
-                </div>
+                </ul>
 
-                <div className="space-y-3 border-t pt-4">
-                  <div className="flex justify-between text-gray-600">
+                <div className="mt-4 space-y-2.5 border-t border-[#dfe7f4] pt-4 text-sm">
+                  <div className="flex justify-between text-slate-600">
                     <span>Subtotal</span>
-                    <span>{formatPeso(subtotalInCents)}</span>
+                    <span className="font-medium text-[#0b1739]">{fmt(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Shipping Fee</span>
-                    <span>{formatPeso(shippingFeeInCents)}</span>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Shipping fee</span>
+                    <span className="font-medium text-[#0b1739]">
+                      {form.paymentMethod === 'pickup' ? 'Free (Pickup)' : fmt(shipping)}
+                    </span>
                   </div>
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between text-xl font-bold">
-                      <span className="text-[#0B1739]">Total</span>
-                      <span className="text-[#2954C8]">{formatPeso(totalInCents)}</span>
-                    </div>
+                  <div className="flex justify-between border-t border-[#dfe7f4] pt-2.5">
+                    <span className="font-bold text-[#0b1739]">Total</span>
+                    <span className="text-xl font-extrabold text-[#2954C8]">{fmt(total)}</span>
                   </div>
                 </div>
+              </div>
 
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full mt-6 bg-[#2EA7FF] hover:bg-[#2197E9] text-white font-semibold py-6 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? 'Placing Order...' : 'Place Order'}
-                </Button>
-              </motion.div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-lg bg-[#2954C8] py-3.5 text-sm font-semibold text-white transition hover:bg-[#1f44a5] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? 'Placing order...' : `Place order · ${fmt(total)}`}
+              </button>
+
+              <p className="text-center text-xs text-slate-400">
+                By placing your order you agree to our cooperative commerce terms.
+              </p>
             </div>
           </div>
         </form>
       </div>
-    </div>
+    </>
   );
 };
 
 export default CheckoutPage;
-

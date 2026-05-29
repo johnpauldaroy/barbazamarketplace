@@ -26,17 +26,19 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 
 const AdminOverviewPage = () => {
-  const { summary, salesTrend, recentActivities, formatPeso } = useOutletContext();
-  // Derive category data from products or mock it if unavailable in summary
+  const { summary, salesTrend, recentActivities, formatPeso, refreshing, lastSync, onRefresh, dashboard } = useOutletContext();
+  const PIE_COLORS = ['#2954C8', '#2EA7FF', '#12B981', '#F6C343', '#FF5A75', '#94A3B8'];
   const categoryData = useMemo(() => {
-    // In a real app, this would come from the backend
-    return [
-      { name: 'Electronics', value: 45, color: '#2954C8' },
-      { name: 'Fashion', value: 25, color: '#2EA7FF' },
-      { name: 'Groceries', value: 20, color: '#10B981' },
-      { name: 'Home', value: 10, color: '#F59E0B' },
-    ];
-  }, []);
+    const breakdown = dashboard?.category_breakdown;
+    if (Array.isArray(breakdown) && breakdown.length > 0) {
+      return breakdown.map((item, i) => ({
+        name: item.name || item.category || `Category ${i + 1}`,
+        value: Number(item.count || item.value || 0),
+        color: PIE_COLORS[i % PIE_COLORS.length],
+      }));
+    }
+    return [];
+  }, [dashboard]);
 
   const statTiles = [
     { 
@@ -79,6 +81,28 @@ const AdminOverviewPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Live sync indicator */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800">Overview</h1>
+          {lastSync && (
+            <p className="text-xs text-slate-400">
+              Last updated {lastSync.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {' '}· auto-refreshes every 30s
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <TrendingUp className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+
       <section id="stats" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {statTiles.map((item, index) => {
           const Icon = item.icon;

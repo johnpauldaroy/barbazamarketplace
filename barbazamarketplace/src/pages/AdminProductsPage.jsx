@@ -26,7 +26,7 @@ const normalizeProduct = (product) => ({
   displayName: product?.name || product?.title || 'Untitled Product',
   displayCategory: product?.category || 'Uncategorized',
   displayAmount: Number(product?.price ?? 0),
-  displayImage: resolveProductImage(product?.image_url || product?.image) || 'https://via.placeholder.com/40',
+  displayImage: resolveProductImage(product?.image_url || product?.image) || null,
   displayStock: Number(product?.stock ?? 0),
 });
 
@@ -340,11 +340,17 @@ const AdminProductsPage = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-slate-100 p-1">
-                            <img 
-                              src={product.displayImage}
-                              alt={product.displayName}
-                              className="h-full w-full object-cover rounded-md"
-                            />
+                            {product.displayImage ? (
+                              <img
+                                src={product.displayImage}
+                                alt={product.displayName}
+                                className="h-full w-full object-cover rounded-md"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center rounded-md bg-slate-200 text-[8px] text-slate-400">
+                                No img
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-slate-800">{product.displayName}</p>

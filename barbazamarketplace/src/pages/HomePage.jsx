@@ -3,352 +3,295 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
+  Leaf,
   ShieldCheck,
   ShoppingBag,
-  Sprout,
   Star,
   Truck,
 } from 'lucide-react';
 import { fetchProducts } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../hooks/useCart';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
 import { buildSimpleCartItem } from '../lib/marketplace';
 
-const VALUE_PILLARS = [
+const CATEGORIES = [
+  { label: 'Fresh Produce', icon: Leaf, color: 'bg-green-50 text-green-700', border: 'border-green-100' },
+  { label: 'Handicrafts', icon: ShoppingBag, color: 'bg-amber-50 text-amber-700', border: 'border-amber-100' },
+  { label: 'Dry Goods', icon: ShieldCheck, color: 'bg-blue-50 text-blue-700', border: 'border-blue-100' },
+  { label: 'Local Products', icon: CircleDollarSign, color: 'bg-purple-50 text-purple-700', border: 'border-purple-100' },
+];
+
+const TRUST_ITEMS = [
   {
     icon: ShieldCheck,
-    title: 'Trusted member products',
-    description: 'Products are sourced from Barbaza MPC members and local partners with accountability, care, and community trust.',
+    title: 'Verified cooperative products',
+    desc: 'Every item is sourced from accountable Barbaza MPC members and trusted local partners.',
   },
   {
     icon: Truck,
-    title: 'Convenient community shopping',
-    description: 'Families can browse essential goods more easily while the cooperative manages orders in one organized marketplace.',
+    title: 'Convenient community delivery',
+    desc: 'Families can easily browse and order essential goods in one organized marketplace.',
   },
   {
     icon: CircleDollarSign,
     title: 'Fair and sustainable pricing',
-    description: 'Prices are set to remain affordable for buyers while helping sustain member livelihoods and cooperative growth.',
+    desc: 'Prices stay affordable for buyers while sustaining member livelihoods and cooperative growth.',
   },
   {
-    icon: Sprout,
+    icon: Leaf,
     title: 'Community impact',
-    description: 'Every purchase helps strengthen local income, shared progress, and the long-term mission of Barbaza MPC.',
-  },
-];
-
-const HERO_SLIDES = [
-  {
-    title: 'Local farmer in Barbaza',
-    image: '/assets/images/local_farmer_alt2.jpg',
-    statLabel: 'Local Filipino farmers',
-    statValue: 'Barbaza harvest from field to home',
-    accentIcon: Sprout,
-    accentTitle: 'Community-grown produce',
-    accentText: 'Fresh crops sourced from local cooperative farmers.',
-  },
-  {
-    title: 'Farmers during harvest season',
-    image: '/assets/images/vegetables_fruits_harvest.jpg',
-    statLabel: 'Harvest season',
-    statValue: 'Supporting hardworking local growers',
-    accentIcon: ShoppingBag,
-    accentTitle: 'Local farm network',
-    accentText: 'Built around trusted farmers and fair local trade.',
-  },
-  {
-    title: 'Antique local products',
-    image: '/assets/images/antique_handicrafts.jpg',
-    statLabel: 'Handicrafts:',
-    statValue: 'Patadyong apparel and textiles, buri palm vases, and other woven items.',
-    accentIcon: ShieldCheck,
-    accentTitle: 'Antique handicraft makers',
-    accentText: 'Handcrafted woven products and textiles from local artisans.',
+    desc: 'Every purchase helps strengthen local income, shared progress, and the cooperative mission.',
   },
 ];
 
 const HomePage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsError, setProductsError] = useState('');
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [loading, setLoading] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadProducts = async () => {
-      setProductsLoading(true);
-      setProductsError('');
-
-      try {
-        const data = await fetchProducts({ page: 1, per_page: 4, sort: 'name' });
-        const items = Array.isArray(data?.products) ? data.products : [];
-        if (isMounted) setFeaturedProducts(items);
-      } catch (error) {
-        if (isMounted) setProductsError(error?.message || 'Failed to load products');
-      } finally {
-        if (isMounted) setProductsLoading(false);
-      }
-    };
-
-    loadProducts();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setActiveSlide((current) => (current + 1) % HERO_SLIDES.length);
-    }, 5000);
-
-    return () => clearInterval(intervalId);
+    let mounted = true;
+    setLoading(true);
+    fetchProducts({ page: 1, per_page: 8, sort: 'name' })
+      .then((data) => {
+        if (mounted) setFeaturedProducts(Array.isArray(data?.products) ? data.products : []);
+      })
+      .catch(() => {})
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, []);
 
   const handleQuickAdd = (product) => {
-    const { product: cartProduct, variant } = buildSimpleCartItem(product);
-    addToCart(cartProduct, variant, 1, variant.inventory_quantity).catch((error) => {
-      console.error(error);
-    });
+    const { product: p, variant } = buildSimpleCartItem(product);
+    addToCart(p, variant, 1, variant.inventory_quantity).catch(console.error);
   };
 
-  const currentHeroSlide = HERO_SLIDES[activeSlide];
-  const CurrentAccentIcon = currentHeroSlide.accentIcon;
-
   return (
-    <div className="pb-16">
+    <>
       <Helmet>
-        <title>e-KoopMart</title>
-        <meta
-          name="description"
-          content="Shop quality products while supporting our cooperative members and strengthening our community."
-        />
+        <title>e-KoopMart — Community Cooperative Marketplace</title>
+        <meta name="description" content="Shop quality products while supporting Barbaza MPC cooperative members and strengthening our community." />
       </Helmet>
 
-      <section className="relative overflow-hidden border-b border-white/60">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(46,167,255,0.18),_transparent_28%),linear-gradient(135deg,#0b1739_0%,#15337f_55%,#2ea7ff_100%)]" />
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-20">
-          <div className="max-w-2xl text-white">
-            <Badge className="border border-white/15 bg-white/10 text-white">
-              Marketplace refresh
-            </Badge>
-            <h1 className="mt-6 text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">
-              Supporting local members, shared growth, and community-centered commerce.
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-white/78 sm:text-lg">
-              Explore products from cooperative members and local producers through a marketplace built to strengthen livelihoods, encourage shared progress, and make everyday shopping more meaningful for the whole community.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/products">
-                <Button size="lg" className="gap-2 bg-white text-[#0b1739] shadow-none hover:bg-[#eef5ff]">
-                  Browse products
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/about">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-white/25 bg-white/5 text-white hover:border-white hover:bg-white/10 hover:text-white"
-                >
-                  Learn about the cooperative
-                </Button>
-              </Link>
-            </div>
+      {/* ── HERO ── */}
+      <section className="relative overflow-hidden bg-[#0b1739]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(46,167,255,0.22),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(41,84,200,0.18),transparent_50%)]"
+        />
+        <div className="section relative py-10 md:py-20">
+          {/* Mobile hero image — shows below lg */}
+          <div className="mb-6 overflow-hidden rounded-xl lg:hidden">
+            <img
+              src="/assets/images/local_farmer_alt2.jpg"
+              alt="Local farmers in Barbaza"
+              className="h-44 w-full object-cover object-center"
+            />
           </div>
 
-          <div className="relative">
-            <div className="surface-card relative overflow-hidden border-white/10 bg-white/12 p-4 backdrop-blur-md">
-              <div className="relative h-[440px] overflow-hidden rounded-[26px]">
-                {HERO_SLIDES.map((slide, index) => (
-                  <div
-                    key={slide.title}
-                    className={`absolute inset-0 transition-all duration-700 ${
-                      index === activeSlide
-                        ? 'scale-100 opacity-100'
-                        : 'scale-[1.03] opacity-0'
-                    }`}
-                  >
-                    <img
-                      src={slide.image}
-                      alt={slide.title}
-                      className="h-full w-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b1739]/60 via-transparent to-[#0b1739]/25" />
-                  </div>
-                ))}
-
-                <div className="absolute inset-x-0 bottom-0 flex justify-end p-4">
-                  <div className="hidden items-center gap-2 md:flex">
-                    <button
-                      type="button"
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-white/85 text-[#0b1739] transition hover:bg-white"
-                      onClick={() =>
-                        setActiveSlide((current) =>
-                          current === 0 ? HERO_SLIDES.length - 1 : current - 1
-                        )
-                      }
-                      aria-label="Previous slide"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-white/85 text-[#0b1739] transition hover:bg-white"
-                      onClick={() =>
-                        setActiveSlide((current) => (current + 1) % HERO_SLIDES.length)
-                      }
-                      aria-label="Next slide"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+            {/* Copy */}
+            <div className="text-white">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+                <Star className="h-3 w-3 fill-current text-yellow-300" />
+                Barbaza MPC Community Marketplace
+              </span>
+              <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+                Supporting local members,{' '}
+                <span className="text-[#7ec8ff]">shared growth.</span>
+              </h1>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-white/65">
+                Explore products from cooperative members and local producers through a marketplace
+                built to strengthen livelihoods, encourage shared progress, and make everyday
+                shopping more meaningful.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  to="/products"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#0b1739] shadow-lg hover:bg-[#f0f6ff] transition-colors"
+                >
+                  Browse marketplace
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/stores"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+                >
+                  View all stores
+                </Link>
+              </div>
+              {/* Stats */}
+              <div className="mt-8 grid grid-cols-3 gap-4 border-t border-white/15 pt-6 text-sm sm:gap-6">
+                <div>
+                  <p className="text-xl font-bold text-white sm:text-2xl">100+</p>
+                  <p className="text-xs text-white/55 sm:text-sm">Products listed</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-white sm:text-2xl">Local</p>
+                  <p className="text-xs text-white/55 sm:text-sm">Member stores</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-white sm:text-2xl">Fair</p>
+                  <p className="text-xs text-white/55 sm:text-sm">Cooperative prices</p>
                 </div>
               </div>
+            </div>
 
-              <Card className="absolute bottom-6 left-6 z-10 max-w-[300px] border-white/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] backdrop-blur-none">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef5ff] text-[#2954C8]">
-                      <CurrentAccentIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#0b1739]">{currentHeroSlide.accentTitle}</p>
-                      <p className="text-sm leading-6 text-slate-600">{currentHeroSlide.accentText}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="absolute right-6 top-6 z-10 max-w-[260px] border-white/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.18)] backdrop-blur-none">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <Star className="h-5 w-5 text-[#f6c343]" />
-                  <div>
-                      <p className="text-sm font-semibold text-[#0b1739]">{currentHeroSlide.statLabel}</p>
-                    <p className="text-xs leading-5 text-slate-600">{currentHeroSlide.statValue}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="mt-4 flex items-center justify-center gap-2">
-                {HERO_SLIDES.map((slide, index) => (
-                  <button
-                    key={slide.statLabel}
-                    type="button"
-                    className={`h-2.5 rounded-full transition-all ${
-                      index === activeSlide ? 'w-8 bg-white' : 'w-2.5 bg-white/45 hover:bg-white/70'
-                    }`}
-                    onClick={() => setActiveSlide(index)}
-                    aria-label={`Go to slide ${index + 1}`}
-                  />
-                ))}
+            {/* Hero image */}
+            <div className="hidden lg:block">
+              <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+                <img
+                  src="/assets/images/local_farmer_alt2.jpg"
+                  alt="Local farmers in Barbaza"
+                  className="h-[420px] w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1739]/50 via-transparent to-transparent" />
+                <div className="absolute bottom-5 left-5 right-5 rounded-xl border border-white/20 bg-white/15 p-4 backdrop-blur-md">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Featured</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    Fresh crops sourced from local cooperative farmers
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      {/* ── CATEGORY STRIP ── */}
+      <section className="border-b border-[#dfe7f4] bg-white">
+        <div className="section py-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {CATEGORIES.map(({ label, icon: Icon, color, border }) => (
+              <Link
+                key={label}
+                to={`/products?category=${encodeURIComponent(label)}`}
+                className={`flex items-center gap-3 rounded-xl border ${border} ${color} px-4 py-3.5 text-sm font-semibold transition-all hover:shadow-sm hover:scale-[1.02]`}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/60">
+                  <Icon className="h-4 w-4" />
+                </div>
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURED PRODUCTS ── */}
+      <section className="section py-14">
+        <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <Badge variant="secondary">Why shop with Barbaza MPC</Badge>
-            <h2 className="mt-3 text-3xl font-bold text-[#0b1739]">A marketplace built for members, families, and the wider community.</h2>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#2954C8]">Featured catalog</p>
+            <h2 className="mt-1.5 text-2xl font-bold text-[#0b1739] sm:text-3xl">
+              Popular picks from the cooperative
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-slate-500">
+              Discover fresh essentials and local favorites from Barbaza MPC member stores.
+            </p>
           </div>
-          <p className="max-w-2xl text-sm leading-7 text-slate-500">
-            Barbaza MPC brings cooperative products closer to the community through a trusted online marketplace that supports local producers, fair trade, and shared economic growth.
-          </p>
+          <Link
+            to="/products"
+            className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-[#2954C8] hover:text-[#1f44a5] sm:flex"
+          >
+            View all
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {VALUE_PILLARS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card key={item.title} className="bg-white/95">
-                <CardContent className="p-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef5ff] text-[#2954C8]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="mt-5 text-lg font-semibold text-[#0b1739]">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-500">{item.description}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
+        {loading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-[360px] animate-pulse rounded-xl bg-[#e8eef8]" />
+            ))}
+          </div>
+        ) : featuredProducts.length === 0 ? (
+          <div className="rounded-xl border border-[#dfe7f4] bg-white p-12 text-center text-sm text-slate-400">
+            No products available yet.
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {featuredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} onAddToCart={handleQuickAdd} />
+            ))}
+          </div>
+        )}
+
+        <div className="mt-8 text-center sm:hidden">
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#dfe7f4] bg-white px-6 py-2.5 text-sm font-semibold text-[#2954C8] shadow-sm"
+          >
+            View all products
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="surface-card overflow-hidden p-6 sm:p-8">
-          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <Badge variant="secondary">Featured catalog</Badge>
-              <h2 className="mt-3 text-3xl font-bold text-[#0b1739]">Popular picks from the cooperative marketplace</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                Discover fresh essentials and local favorites in a cleaner, easier shopping experience.
+      {/* ── PROMO BANNER ── */}
+      <section className="section pb-14">
+        <div className="relative overflow-hidden rounded-2xl bg-[#0b1739]">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_right,rgba(46,167,255,0.2),transparent_55%)]"
+          />
+          <div className="relative flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between lg:p-12">
+            <div className="max-w-lg text-white">
+              <span className="inline-block rounded-full bg-white/15 px-3 py-0.5 text-xs font-semibold text-white/80">
+                Barbaza MPC
+              </span>
+              <h2 className="mt-3 text-2xl font-bold sm:text-3xl">
+                Supporting local products, cooperative values, and shared community progress.
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-white/60">
+                Barbaza MPC connects members, families, and local producers through one marketplace
+                that promotes trusted products and strengthens the cooperative mission.
               </p>
             </div>
-            <Link to="/products">
-              <Button variant="outline" className="gap-2">
-                View full marketplace
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-
-          {productsLoading ? (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={`featured-skeleton-${index}`}
-                  className="h-[420px] rounded-[30px] border border-[#e5edf8] bg-[#f5f8fe] animate-pulse"
-                />
-              ))}
-            </div>
-          ) : productsError ? (
-            <Card className="border-rose-200 bg-rose-50 text-rose-700">
-              <CardContent className="p-6">{productsError}</CardContent>
-            </Card>
-          ) : featuredProducts.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-slate-500">No products available yet.</CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} onAddToCart={handleQuickAdd} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <Card className="overflow-hidden bg-gradient-to-r from-[#0b1739] via-[#1b44b7] to-[#2ea7ff] text-white">
-          <CardContent className="flex flex-col gap-6 p-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <Badge className="bg-white/12 text-white">Barbaza MPC community marketplace</Badge>
-              <h2 className="mt-4 text-3xl font-bold">Supporting local products, cooperative values, and shared community progress.</h2>
-              <p className="mt-3 text-sm leading-7 text-white/75">
-                Barbaza MPC connects members, families, and local producers through one marketplace that helps promote trusted products and strengthen the cooperative mission.
-              </p>
-            </div>
-            <Link to="/admin">
-              <Button size="lg" className="bg-white text-[#0b1739] shadow-none hover:bg-[#eef5ff]">
+            <div className="flex flex-col gap-3 sm:shrink-0">
+              <Link
+                to="/about"
+                className="rounded-lg bg-white px-6 py-3 text-center text-sm font-semibold text-[#0b1739] hover:bg-[#f0f6ff] transition-colors"
+              >
                 Learn more
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+              </Link>
+              <Link
+                to="/products"
+                className="rounded-lg border border-white/25 bg-white/10 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+              >
+                Shop now
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
-    </div>
+
+      {/* ── TRUST / WHY SECTION ── */}
+      <section className="border-t border-[#dfe7f4] bg-white">
+        <div className="section py-14">
+          <div className="mb-10 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#2954C8]">
+              Why shop with Barbaza MPC
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-[#0b1739] sm:text-3xl">
+              A marketplace built for members, families, and the wider community
+            </h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="rounded-xl border border-[#dfe7f4] bg-white p-6 shadow-sm">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef3fb] text-[#2954C8]">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-semibold text-[#0b1739]">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
   );
 };
 
