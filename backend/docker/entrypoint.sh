@@ -52,11 +52,17 @@ fi
 php artisan config:cache
 php artisan route:cache
 
-# --- Storage link (public disk) ---
+# --- Ensure storage directories exist (volume mount may be empty) ---
+mkdir -p storage/app/public storage/app/private \
+         storage/framework/cache storage/framework/sessions \
+         storage/framework/views storage/logs bootstrap/cache
+
+# --- Storage symlink: public/storage -> storage/app/public ---
 php artisan storage:link --force 2>/dev/null || true
 
-# --- Fix permissions ---
+# --- Fix permissions so nginx + php-fpm can both read/write ---
 chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
 
 echo "Starting supervisord (nginx + laravel)..."
 exec supervisord -c /etc/supervisord.conf

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Pagination from '../components/ui/Pagination';
+const PAGE_SIZE = 10;
 import { Search, UserPlus, Mail, Shield, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -66,18 +68,21 @@ const AdminCustomersPage = () => {
     loadUsers();
   }, [loadUsers]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return users;
-
     return users.filter((user) =>
-      [user?.name, user?.email]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+      [user?.name, user?.email].filter(Boolean).join(' ').toLowerCase().includes(query)
     );
   }, [users, searchQuery]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
+
+  const lastPage = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedCustomers = filteredCustomers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openAddDialog = () => {
     setEditingUser(null);
@@ -261,12 +266,12 @@ const AdminCustomersPage = () => {
               <tbody className="divide-y divide-[#ECF1FA]">
                 {loading ? (
                    <tr><td colSpan="5" className="py-10 text-center text-slate-400 animate-pulse">Loading directory...</td></tr>
-                ) : filteredCustomers.length === 0 ? (
+                ) : pagedCustomers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-20 text-center text-slate-500">No users found.</td>
                   </tr>
                 ) : (
-                  filteredCustomers.map((user) => (
+                  pagedCustomers.map((user) => (
                     <tr key={user.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -322,6 +327,7 @@ const AdminCustomersPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

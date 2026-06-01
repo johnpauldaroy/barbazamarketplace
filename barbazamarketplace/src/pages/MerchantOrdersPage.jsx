@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Filter, Package, Search, Eye } from 'lucide-react'; // Ensure Eye is imported
+import { Download, Filter, Package, Search, Eye } from 'lucide-react';
+import Pagination from '../components/ui/Pagination';
+const PAGE_SIZE = 10;
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -75,24 +77,23 @@ const MerchantOrdersPage = () => {
     return () => clearTimeout(timeoutId);
   }, [loadOrders]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       if (statusFilter !== 'all' && order.status !== statusFilter) return false;
       const query = searchQuery.trim().toLowerCase();
       if (!query) return true;
-
-      return [
-        order.id,
-        order.customer?.name,
-        order.customer?.email,
-        order.status,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
+      return [order.id, order.customer?.name, order.customer?.email, order.status]
+        .filter(Boolean).join(' ').toLowerCase().includes(query);
     });
   }, [orders, searchQuery, statusFilter]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, statusFilter]);
+
+  const lastPage = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedOrders = filteredOrders.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const handleStatusChange = async (orderId, status) => {
     setUpdatingOrderId(orderId);
@@ -204,14 +205,14 @@ const MerchantOrdersPage = () => {
                       Loading orders...
                     </td>
                   </tr>
-                ) : filteredOrders.length === 0 ? (
+                ) : pagedOrders.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="py-20 text-center text-slate-500">
                       No matching orders found.
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => {
+                  pagedOrders.map((order) => {
                     const storeSubtotal = Number(order.store_subtotal_amount || 0);
                     const fullTotal = Number(order.total_amount || 0);
                     const showFullTotal = Math.abs(storeSubtotal - fullTotal) > 0.009;
@@ -288,6 +289,7 @@ const MerchantOrdersPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

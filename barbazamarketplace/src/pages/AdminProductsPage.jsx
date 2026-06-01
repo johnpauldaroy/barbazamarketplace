@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '../components/ui/use-toast';
 import { createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const INITIAL_FORM = {
   storeId: '',
@@ -47,6 +50,7 @@ const AdminProductsPage = () => {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [stores, setStores] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -140,17 +144,23 @@ const AdminProductsPage = () => {
   );
 
   const query = searchQuery.trim().toLowerCase();
-  const filteredProducts = useMemo(
-    () =>
-      normalizedProducts.filter((product) => {
-        if (!query) return true;
-        return (
-          product.displayName.toLowerCase().includes(query) ||
-          product.displayCategory.toLowerCase().includes(query)
-        );
-      }),
-    [normalizedProducts, query]
-  );
+  const filteredProducts = useMemo(() => {
+    const result = normalizedProducts.filter((product) => {
+      if (!query) return true;
+      return (
+        product.displayName.toLowerCase().includes(query) ||
+        product.displayCategory.toLowerCase().includes(query)
+      );
+    });
+    return result;
+  }, [normalizedProducts, query]);
+
+  const lastPage = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedProducts = filteredProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset to page 1 when search query or store filter changes
+  useEffect(() => { setCurrentPage(1); }, [query, selectedStoreId]);
 
   const tableLoading = isLoadingProducts || (loading && products.length === 0);
 
@@ -340,7 +350,7 @@ const AdminProductsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => (
+                  pagedProducts.map((product) => (
                     <tr key={product.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -413,6 +423,13 @@ const AdminProductsPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={safePage}
+            lastPage={lastPage}
+            hasMore={safePage < lastPage}
+            onPageChange={(p) => setCurrentPage(p)}
+            loading={tableLoading}
+          />
         </CardContent>
       </Card>
 

@@ -187,7 +187,7 @@ class MerchantStoreController extends Controller
             return $normalized;
         }
 
-        return asset('storage/' . $path);
+        return '/storage/' . $path;
     }
 
     protected function extractStoragePath(?string $storedValue): ?string

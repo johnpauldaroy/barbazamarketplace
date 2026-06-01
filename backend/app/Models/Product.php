@@ -52,7 +52,7 @@ class Product extends Model
     public function getImageUrlAttribute()
     {
         if ($this->image) {
-            return asset('storage/' . $this->image);
+            return '/storage/' . $this->image;
         }
         return null;
     }

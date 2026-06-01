@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Pagination from '../components/ui/Pagination';
+const PAGE_SIZE = 10;
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -89,15 +91,21 @@ const MerchantProductsPage = () => {
     [products]
   );
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredProducts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return normalizedProducts;
-
-    return normalizedProducts.filter((product) => (
-      product.displayName.toLowerCase().includes(query) ||
-      product.displayCategory.toLowerCase().includes(query)
-    ));
+    return normalizedProducts.filter((p) =>
+      p.displayName.toLowerCase().includes(query) || p.displayCategory.toLowerCase().includes(query)
+    );
   }, [normalizedProducts, searchQuery]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
+
+  const lastPage = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedProducts = filteredProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openAddDialog = () => {
     setEditingProduct(null);
@@ -243,10 +251,10 @@ const MerchantProductsPage = () => {
               <tbody className="divide-y divide-[#ECF1FA]">
                 {isLoadingProducts ? (
                   <tr><td colSpan="5" className="py-10 text-center text-slate-400 animate-pulse">Loading catalog...</td></tr>
-                ) : filteredProducts.length === 0 ? (
+                ) : pagedProducts.length === 0 ? (
                   <tr><td colSpan="5" className="py-20 text-center text-slate-500">No products found.</td></tr>
                 ) : (
-                  filteredProducts.map((product) => (
+                  pagedProducts.map((product) => (
                     <tr key={product.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -285,6 +293,7 @@ const MerchantProductsPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

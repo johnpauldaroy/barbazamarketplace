@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, Store, UserPlus, Edit, Power } from 'lucide-react';
+import Pagination from '../components/ui/Pagination';
+const PAGE_SIZE = 10;
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -70,18 +72,21 @@ const AdminStoresPage = () => {
     loadStores();
   }, [loadStores]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredStores = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return stores;
-
     return stores.filter((store) =>
-      [store?.name, store?.slug, store?.description]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+      [store?.name, store?.slug, store?.description].filter(Boolean).join(' ').toLowerCase().includes(query)
     );
   }, [stores, searchQuery]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
+
+  const lastPage = Math.max(1, Math.ceil(filteredStores.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedStores = filteredStores.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openAddStoreDialog = () => {
     setEditingStore(null);
@@ -261,10 +266,10 @@ const AdminStoresPage = () => {
               <tbody className="divide-y divide-[#ECF1FA]">
                 {loading ? (
                   <tr><td colSpan="4" className="py-10 text-center text-slate-400 animate-pulse">Loading stores...</td></tr>
-                ) : filteredStores.length === 0 ? (
+                ) : pagedStores.length === 0 ? (
                   <tr><td colSpan="4" className="py-20 text-center text-slate-500">No stores found.</td></tr>
                 ) : (
-                  filteredStores.map((store) => (
+                  pagedStores.map((store) => (
                     <tr key={store.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-800">{store.name}</p>
@@ -307,6 +312,7 @@ const AdminStoresPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

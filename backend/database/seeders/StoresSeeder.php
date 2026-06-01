@@ -39,7 +39,7 @@ class StoresSeeder extends Seeder
                 'status'        => 'active',
                 'description'   => 'Percibal Store',
                 'contact_email' => 'pers@gmail.com',
-                'contact_phone' => '091234567890',
+                'contact_phone' => '0919 065 4532',
                 'address_line_1'=> 'Poblacion, Barbaza, Antique',
                 'address_line_2'=> null,
                 'city'          => 'Barbaza',

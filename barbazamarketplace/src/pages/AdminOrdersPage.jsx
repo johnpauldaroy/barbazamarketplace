@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 import { Search, Filter, Download, Package, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -25,6 +28,14 @@ const AdminOrdersPage = () => {
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const lastPage = Math.max(1, Math.ceil((filteredOrders?.length || 0) / PAGE_SIZE));
+  const safePage = Math.min(currentPage, lastPage);
+  const pagedOrders = useMemo(
+    () => (filteredOrders || []).slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredOrders, safePage]
+  );
 
   return (
     <div className="space-y-6">
@@ -90,7 +101,7 @@ const AdminOrdersPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
+                  pagedOrders.map((order) => (
                     <tr key={order.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-800">#{order.id}</p>
@@ -153,6 +164,7 @@ const AdminOrdersPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

@@ -69,10 +69,11 @@ COPY docker/supervisord.conf /etc/supervisord.conf
 # Entrypoint
 COPY backend/docker/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint \
-    && mkdir -p storage/app/public storage/framework/cache \
-       storage/framework/sessions storage/framework/views \
-       storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && mkdir -p storage/app/public storage/app/private \
+       storage/framework/cache storage/framework/sessions \
+       storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
 

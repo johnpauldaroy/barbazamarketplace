@@ -114,6 +114,6 @@ class PublicStoreController extends Controller
             ? Str::after($normalizedPath, 'storage/')
             : $normalizedPath;
 
-        return asset('storage/' . $path);
+        return '/storage/' . $path;
     }
 }
