@@ -36,17 +36,18 @@ RUN apk add --no-cache \
     icu-libs \
     libzip \
     oniguruma \
+    mysql-client \
     && apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
     icu-dev \
     libzip-dev \
     oniguruma-dev \
+    mysql-dev \
     && docker-php-ext-install \
     bcmath \
     mbstring \
     pdo \
     pdo_mysql \
-    pdo_sqlite \
     zip \
     && apk del .build-deps
 
