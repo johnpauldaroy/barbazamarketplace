@@ -145,19 +145,16 @@ const StoresPage = () => {
                 return (
                   <Card key={store.id} className="overflow-hidden rounded-[28px]">
                     <CardContent className="p-6">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef5ff] text-[#2954C8]">
-                            <Store className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-lg font-semibold text-[#0b1739]">{store.name}</p>
-                            <p className="text-xs text-slate-400">{store.slug}</p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#eef5ff] text-[#2954C8]">
+                          {store.logo_image
+                            ? <img src={store.logo_image} alt={store.name} className="h-full w-full object-cover" />
+                            : <Store className="h-5 w-5" />}
                         </div>
-                        <Badge variant="outline">
-                          {Number(store?.product_count || 0)} products
-                        </Badge>
+                        <div>
+                          <p className="text-lg font-semibold text-[#0b1739]">{store.name}</p>
+                          <p className="text-xs text-slate-400">{store.slug}</p>
+                        </div>
                       </div>
 
                       <p className="mt-4 line-clamp-3 text-sm leading-7 text-slate-600">

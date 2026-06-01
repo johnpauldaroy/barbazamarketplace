@@ -148,12 +148,12 @@ const ProductsPage = () => {
               type="button"
               onClick={() => { startTransition(() => setSelectedCategory(cat)); setSidebarOpen(false); }}
               className={cn(
-                'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left',
                 selectedCategory === cat ? 'bg-[#eef3fb] text-[#2954C8]' : 'text-slate-600 hover:bg-[#f4f7fd]'
               )}
             >
-              <Tag className="h-3.5 w-3.5" />
-              {cat}
+              <Tag className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{cat}</span>
             </button>
           ))}
         </div>

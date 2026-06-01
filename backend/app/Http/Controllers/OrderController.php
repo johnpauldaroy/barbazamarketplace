@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderFeedbackLink;
 use App\Models\Product;
+use App\Mail\OrderFeedbackInvitation;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -40,15 +46,32 @@ class OrderController extends Controller
         ]);
     }
 
-    public function adminSummary()
+    public function adminSummary(Request $request)
     {
-        $orders = Order::with(['items.product.store', 'user'])->latest()->get();
+        $from = $request->query('from');
+        $to   = $request->query('to');
+
+        $orderQuery = Order::with(['items.product.store', 'user'])->latest();
+        if ($from) {
+            $orderQuery->whereDate('created_at', '>=', $from);
+        }
+        if ($to) {
+            $orderQuery->whereDate('created_at', '<=', $to);
+        }
+        $orders = $orderQuery->get();
+
         $products = Product::query()->orderBy('title')->get();
-        $productSales = OrderItem::query()
+
+        $productSalesQuery = OrderItem::query()
             ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(quantity * price) as revenue'))
-            ->groupBy('product_id')
-            ->get()
-            ->keyBy('product_id');
+            ->groupBy('product_id');
+        if ($from || $to) {
+            $productSalesQuery->whereHas('order', function (Builder $q) use ($from, $to) {
+                if ($from) $q->whereDate('created_at', '>=', $from);
+                if ($to)   $q->whereDate('created_at', '<=', $to);
+            });
+        }
+        $productSales = $productSalesQuery->get()->keyBy('product_id');
 
         $revenueOrders = $orders->filter(fn (Order $order) => !$this->isInventoryRestored($order->status));
         $totalRevenue = $revenueOrders->sum(fn (Order $order) => (float) $order->total_amount);
@@ -58,21 +81,8 @@ class OrderController extends Controller
             ->unique()
             ->count();
 
-        $monthlySales = collect(range(5, 0))
-            ->map(function (int $monthsAgo) use ($revenueOrders) {
-                $date = now()->startOfMonth()->subMonths($monthsAgo);
-                $monthOrders = $revenueOrders->filter(
-                    fn (Order $order) => optional($order->created_at)->format('Y-m') === $date->format('Y-m')
-                );
-
-                return [
-                    'month' => $date->format('Y-m'),
-                    'label' => $date->format('M'),
-                    'orders' => $monthOrders->count(),
-                    'revenue' => round($monthOrders->sum(fn (Order $order) => (float) $order->total_amount), 2),
-                ];
-            })
-            ->values();
+        // Build sales trend: 6 intervals based on range granularity
+        $monthlySales = $this->buildSalesTrend($revenueOrders, $from, $to);
 
         $statusBreakdown = collect(self::STATUS_FLOW)
             ->map(function (string $status) use ($orders) {
@@ -103,7 +113,6 @@ class OrderController extends Controller
                 if ($left['units_sold'] === $right['units_sold']) {
                     return $right['revenue'] <=> $left['revenue'];
                 }
-
                 return $right['units_sold'] <=> $left['units_sold'];
             })
             ->take(5)
@@ -120,6 +129,16 @@ class OrderController extends Controller
                 'stock' => (int) $product->stock,
                 'image' => $product->image,
                 'image_url' => $product->image_url,
+            ])
+            ->values();
+
+        // Category breakdown for pie chart (filtered)
+        $categoryBreakdown = $orders
+            ->flatMap(fn (Order $order) => $order->items)
+            ->groupBy(fn ($item) => optional($item->product)->category ?: 'Uncategorized')
+            ->map(fn ($items, $category) => [
+                'name' => $category,
+                'count' => $items->count(),
             ])
             ->values();
 
@@ -144,11 +163,85 @@ class OrderController extends Controller
             'status_breakdown' => $statusBreakdown,
             'top_products' => $topProducts,
             'low_stock_products' => $lowStockProducts,
+            'category_breakdown' => $categoryBreakdown,
             'recent_orders' => $orders
                 ->take(8)
                 ->map(fn (Order $order) => $this->formatOrderResponse($order))
                 ->values(),
         ]);
+    }
+
+    private function buildSalesTrend($revenueOrders, ?string $from, ?string $to)
+    {
+        $start = $from ? Carbon::parse($from) : now()->subMonths(5)->startOfMonth();
+        $end   = $to   ? Carbon::parse($to)   : now();
+        $diffDays = $start->diffInDays($end);
+
+        if ($diffDays <= 1) {
+            // Hourly for today
+            return collect(range(0, 23))->map(function (int $hour) use ($revenueOrders, $start) {
+                $hourOrders = $revenueOrders->filter(
+                    fn (Order $o) => optional($o->created_at)->format('Y-m-d H') === $start->format('Y-m-d') . ' ' . str_pad($hour, 2, '0', STR_PAD_LEFT)
+                );
+                return [
+                    'month' => $start->format('Y-m-d') . " {$hour}:00",
+                    'label' => $hour . ':00',
+                    'orders' => $hourOrders->count(),
+                    'revenue' => round($hourOrders->sum(fn (Order $o) => (float) $o->total_amount), 2),
+                ];
+            })->values();
+        }
+
+        if ($diffDays <= 31) {
+            // Daily
+            $days = (int) $diffDays + 1;
+            return collect(range(0, $days - 1))->map(function (int $i) use ($revenueOrders, $start) {
+                $date = $start->copy()->addDays($i);
+                $dayOrders = $revenueOrders->filter(
+                    fn (Order $o) => optional($o->created_at)->format('Y-m-d') === $date->format('Y-m-d')
+                );
+                return [
+                    'month' => $date->format('Y-m-d'),
+                    'label' => $date->format('M j'),
+                    'orders' => $dayOrders->count(),
+                    'revenue' => round($dayOrders->sum(fn (Order $o) => (float) $o->total_amount), 2),
+                ];
+            })->values();
+        }
+
+        if ($diffDays <= 90) {
+            // Weekly
+            $weeks = (int) ceil($diffDays / 7);
+            return collect(range(0, $weeks - 1))->map(function (int $i) use ($revenueOrders, $start) {
+                $weekStart = $start->copy()->addWeeks($i);
+                $weekEnd   = $weekStart->copy()->addDays(6);
+                $weekOrders = $revenueOrders->filter(function (Order $o) use ($weekStart, $weekEnd) {
+                    $d = optional($o->created_at);
+                    return $d && $d->gte($weekStart) && $d->lte($weekEnd);
+                });
+                return [
+                    'month' => $weekStart->format('Y-m-d'),
+                    'label' => 'W' . $weekStart->weekOfYear,
+                    'orders' => $weekOrders->count(),
+                    'revenue' => round($weekOrders->sum(fn (Order $o) => (float) $o->total_amount), 2),
+                ];
+            })->values();
+        }
+
+        // Monthly (default — up to 12 months)
+        $months = min((int) ceil($diffDays / 30), 12);
+        return collect(range(0, $months - 1))->map(function (int $i) use ($revenueOrders, $start) {
+            $date = $start->copy()->startOfMonth()->addMonths($i);
+            $monthOrders = $revenueOrders->filter(
+                fn (Order $o) => optional($o->created_at)->format('Y-m') === $date->format('Y-m')
+            );
+            return [
+                'month' => $date->format('Y-m'),
+                'label' => $date->format('M'),
+                'orders' => $monthOrders->count(),
+                'revenue' => round($monthOrders->sum(fn (Order $o) => (float) $o->total_amount), 2),
+            ];
+        })->values();
     }
 
     public function updateStatus(Request $request, $id)
@@ -395,6 +488,34 @@ class OrderController extends Controller
             DB::commit();
 
             $order->load(['items.product.store', 'user']);
+
+            $customerEmailNormalized = strtolower(trim((string) ($customerEmail ?: '')));
+            if ($customerEmailNormalized !== '') {
+                $token = Str::random(64);
+                $expiresAt = now()->addDays(30);
+
+                OrderFeedbackLink::query()->create([
+                    'order_id' => $order->id,
+                    'email' => $customerEmailNormalized,
+                    'token_hash' => hash('sha256', $token),
+                    'expires_at' => $expiresAt,
+                ]);
+
+                $frontend = rtrim((string) config('app.frontend_url'), '/');
+                $feedbackUrl = "{$frontend}/feedback/{$token}";
+
+                try {
+                    Mail::to($customerEmailNormalized)->send(
+                        new OrderFeedbackInvitation($order, $feedbackUrl, $expiresAt->toISOString())
+                    );
+                } catch (\Throwable $mailError) {
+                    Log::warning('Order feedback invitation email failed', [
+                        'order_id' => $order->id,
+                        'email' => $customerEmailNormalized,
+                        'error' => $mailError->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'message' => 'Order placed successfully',

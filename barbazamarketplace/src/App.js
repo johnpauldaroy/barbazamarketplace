@@ -35,6 +35,7 @@ const SuccessPage = lazy(() => import('./pages/SuccessPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
+const OrderFeedbackPage = lazy(() => import('./pages/OrderFeedbackPage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const MerchantDashboard = lazy(() => import('./pages/MerchantDashboard'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -81,6 +82,7 @@ const AppRoutes = () =>
       ),
     },
     { path: '/order-confirmation', element: <OrderConfirmationPage /> },
+    { path: '/feedback/:token', element: <OrderFeedbackPage /> },
     { path: '/login', element: <LoginPage /> },
     { path: '/register', element: <RegisterPage /> },
     {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Filter, Package, Search } from 'lucide-react';
+import { Download, Filter, Package, Search, Eye } from 'lucide-react'; // Ensure Eye is imported
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -190,6 +190,7 @@ const MerchantOrdersPage = () => {
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Order</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Customer</th>
+                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Store</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Store Items</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Amount</th>
@@ -199,13 +200,13 @@ const MerchantOrdersPage = () => {
               <tbody className="divide-y divide-[#ECF1FA]">
                 {loadingOrders ? (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-500">
+                    <td colSpan="7" className="py-12 text-center text-slate-500">
                       Loading orders...
                     </td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-20 text-center text-slate-500">
+                    <td colSpan="7" className="py-20 text-center text-slate-500">
                       No matching orders found.
                     </td>
                   </tr>
@@ -226,6 +227,9 @@ const MerchantOrdersPage = () => {
                           <p className="truncate text-[10px] font-medium text-slate-400 max-w-[200px]">{order.customer?.email || 'No email'}</p>
                         </td>
                         <td className="px-6 py-4">
+                          <p className="text-xs font-medium text-slate-600">{order.store_name || 'My Store'}</p>
+                        </td>
+                        <td className="px-6 py-4">
                           <p className="text-xs font-medium text-slate-600">{Number(order.store_item_count || 0)} items</p>
                           {order.has_other_store_items && (
                             <p className="text-[10px] font-medium text-amber-600">Includes other-store items</p>
@@ -243,35 +247,38 @@ const MerchantOrdersPage = () => {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 rounded-xl text-[11px] font-bold"
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-[#2954C8] hover:bg-blue-50"
                               onClick={() => handleViewDetails(order.id)}
                             >
-                              View Details
+                              <Eye className="h-4 w-4" />
                             </Button>
-                            <label className="flex items-center rounded-xl border border-[#d7e2f1] bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-[#2954C8]/20">
-                              <select
-                                value={order.status}
-                                disabled={updatingOrderId === order.id || !order.merchant_can_update_status}
-                                onChange={(event) => handleStatusChange(order.id, event.target.value)}
-                                className="h-8 w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed disabled:text-slate-400"
-                              >
-                                {ORDER_STATUS_OPTIONS.map((status) => (
-                                  <option key={status} value={status}>
-                                    {statusLabel(status)}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            {updatingOrderId === order.id && <p className="animate-pulse text-[10px] font-medium text-[#2954C8]">Updating...</p>}
-                            {!order.merchant_can_update_status && (
-                              <p className="text-[10px] font-medium text-amber-600">
-                                Status locked for mixed-store orders.
-                              </p>
-                            )}
+                            <div className="flex flex-col">
+                              <label className="flex h-8 items-center rounded-xl border border-[#d7e2f1] bg-white px-2 shadow-sm focus-within:ring-2 focus-within:ring-[#2954C8]/20">
+                                <select
+                                  value={order.status}
+                                  disabled={updatingOrderId === order.id || !order.merchant_can_update_status}
+                                  onChange={(event) => handleStatusChange(order.id, event.target.value)}
+                                  className="bg-transparent text-[11px] font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed disabled:text-slate-400"
+                                >
+                                  {ORDER_STATUS_OPTIONS.map((status) => (
+                                    <option key={status} value={status}>
+                                      {statusLabel(status)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              {updatingOrderId === order.id && <p className="animate-pulse text-[9px] font-medium text-[#2954C8] text-center">Updating...</p>}
+                              {!order.merchant_can_update_status && (
+                                <p className="text-[9px] font-medium text-amber-600 text-center">
+                                  Status locked.
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -318,6 +325,10 @@ const MerchantOrdersPage = () => {
                 <div>
                   <p className="text-xs text-slate-500">Payment</p>
                   <p className="mt-1 font-medium text-slate-800">{detailOrder.payment_method || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Reference Code</p>
+                  <p className="mt-1 font-medium text-slate-800 uppercase">{detailOrder.payment_reference || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Store Subtotal</p>

@@ -27,6 +27,7 @@ class Store extends Model
         'country',
         'logo_image',
         'cover_image',
+        'facebook_url',
     ];
 
     public function users()

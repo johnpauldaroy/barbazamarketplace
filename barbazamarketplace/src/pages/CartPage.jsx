@@ -13,7 +13,7 @@ const CartPage = () => {
 
   const getUnitCents = (item) => item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
   const subtotal = useMemo(() => cartItems.reduce((s, i) => s + getUnitCents(i) * i.quantity, 0), [cartItems]);
-  const shipping = cartItems.length > 0 ? 5000 : 0;
+  const shipping = 0;
   const total = subtotal + shipping;
 
   const getMax = (item) =>
@@ -161,10 +161,6 @@ const CartPage = () => {
                   <div className="flex justify-between text-slate-600">
                     <span>Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)</span>
                     <span className="font-medium text-[#0b1739]">{fmt(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Shipping fee</span>
-                    <span className="font-medium text-[#0b1739]">{fmt(shipping)}</span>
                   </div>
                 </div>
 

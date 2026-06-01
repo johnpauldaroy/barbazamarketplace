@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, ShoppingBag } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const resolveRedirect = (param) => {
@@ -52,7 +52,7 @@ const LoginPage = () => {
             {/* Logo */}
             <div className="mb-7 flex flex-col items-center gap-3 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef3fb]">
-                <ShoppingBag className="h-7 w-7 text-[#2954C8]" />
+                <img src="/brand-logo-transparent.png" alt="e-KoopMart logo" className="h-10 w-10 object-contain" />
               </div>
               <div>
                 <h1 className="text-2xl font-extrabold text-[#0b1739]">Welcome back</h1>

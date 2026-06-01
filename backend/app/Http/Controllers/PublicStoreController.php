@@ -89,6 +89,8 @@ class PublicStoreController extends Controller
             $payload['postal_code'] = $store->postal_code;
         }
 
+        $payload['facebook_url'] = $store->facebook_url;
+
         return $payload;
     }
 

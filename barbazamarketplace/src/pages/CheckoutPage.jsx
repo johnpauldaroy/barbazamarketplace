@@ -52,7 +52,7 @@ const CheckoutPage = () => {
 
   const getUnitCents = (item) => item.variant.sale_price_in_cents ?? item.variant.price_in_cents ?? 0;
   const subtotal = useMemo(() => cartItems.reduce((s, i) => s + getUnitCents(i) * i.quantity, 0), [cartItems]);
-  const shipping = cartItems.length > 0 && form.paymentMethod !== 'pickup' ? 5000 : 0;
+  const shipping = 0;
   const total = subtotal + shipping;
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -287,12 +287,6 @@ const CheckoutPage = () => {
                   <div className="flex justify-between text-slate-600">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0b1739]">{fmt(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Shipping fee</span>
-                    <span className="font-medium text-[#0b1739]">
-                      {form.paymentMethod === 'pickup' ? 'Free (Pickup)' : fmt(shipping)}
-                    </span>
                   </div>
                   <div className="flex justify-between border-t border-[#dfe7f4] pt-2.5">
                     <span className="font-bold text-[#0b1739]">Total</span>

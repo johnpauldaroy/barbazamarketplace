@@ -396,15 +396,15 @@ const StoreDetailPage = () => {
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-600">
               {store?.contact_email ? (
-                <p className="inline-flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-[#2954C8]" />
+                <p className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 shrink-0 text-[#2954C8]" />
                   {store.contact_email}
                 </p>
               ) : null}
 
               {store?.contact_phone ? (
-                <p className="inline-flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-[#2954C8]" />
+                <p className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 shrink-0 text-[#2954C8]" />
                   {store.contact_phone}
                 </p>
               ) : null}
@@ -428,16 +428,27 @@ const StoreDetailPage = () => {
               <p className="mb-4 text-sm text-slate-500">
                 Send a message directly to this seller for product availability, pricing, or delivery concerns.
               </p>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setSubmitError('');
-                  setSubmitSuccess('');
-                  setIsContactDialogOpen(true);
-                }}
-              >
-                Contact Seller
-              </Button>
+              {store?.facebook_url ? (
+                <a href={store.facebook_url} target="_blank" rel="noopener noreferrer" className="block w-full">
+                  <Button className="w-full gap-2">
+                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.885v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+                    </svg>
+                    Message on Facebook
+                  </Button>
+                </a>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setSubmitError('');
+                    setSubmitSuccess('');
+                    setIsContactDialogOpen(true);
+                  }}
+                >
+                  Contact Seller
+                </Button>
+              )}
               {submitSuccess ? <p className="mt-3 text-xs text-emerald-600">{submitSuccess}</p> : null}
             </CardContent>
           </Card>

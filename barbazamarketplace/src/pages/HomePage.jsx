@@ -84,7 +84,7 @@ const HomePage = () => {
           {/* Mobile hero image — shows below lg */}
           <div className="mb-6 overflow-hidden rounded-xl lg:hidden">
             <img
-              src="/assets/images/local_farmer_alt2.jpg"
+              src="/assets/images/local_farmer_antique.png"
               alt="Local farmers in Barbaza"
               className="h-44 w-full object-cover object-center"
             />
@@ -142,7 +142,7 @@ const HomePage = () => {
             <div className="hidden lg:block">
               <div className="relative overflow-hidden rounded-2xl shadow-2xl">
                 <img
-                  src="/assets/images/local_farmer_alt2.jpg"
+                  src="/assets/images/local_farmer_antique.png"
                   alt="Local farmers in Barbaza"
                   className="h-[420px] w-full object-cover"
                 />

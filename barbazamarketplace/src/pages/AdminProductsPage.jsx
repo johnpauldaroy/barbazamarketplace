@@ -17,6 +17,7 @@ const INITIAL_FORM = {
   category: '',
   price: '',
   stock: '',
+  stockThreshold: '5',
   description: '',
   imageFile: null,
 };
@@ -28,6 +29,7 @@ const normalizeProduct = (product) => ({
   displayAmount: Number(product?.price ?? 0),
   displayImage: resolveProductImage(product?.image_url || product?.image) || null,
   displayStock: Number(product?.stock ?? 0),
+  displayThreshold: Number(product?.stock_threshold ?? 5),
 });
 
 const AdminProductsPage = () => {
@@ -166,6 +168,7 @@ const AdminProductsPage = () => {
       category: product?.category || '',
       price: product?.price != null ? String(product.price) : '',
       stock: product?.stock != null ? String(product.stock) : '',
+      stockThreshold: product?.stock_threshold != null ? String(product.stock_threshold) : '5',
       description: product?.description || '',
       imageFile: null,
     });
@@ -190,11 +193,12 @@ const AdminProductsPage = () => {
     const parsedStoreId = form.storeId ? Number(form.storeId) : null;
     const parsedPrice = Number(form.price);
     const parsedStock = Number(form.stock);
+    const parsedThreshold = Number(form.stockThreshold);
 
-    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock)) {
+    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedThreshold)) {
       toast({
         title: 'Invalid form input',
-        description: 'Title, category, price, and stock are required.',
+        description: 'Title, category, price, stock, and alert threshold are required.',
         variant: 'destructive',
       });
       return;
@@ -215,6 +219,7 @@ const AdminProductsPage = () => {
       store_id: parsedStoreId || undefined,
       price: parsedPrice,
       stock: Math.floor(parsedStock),
+      stock_threshold: Math.floor(parsedThreshold),
       description,
     };
 
@@ -226,7 +231,7 @@ const AdminProductsPage = () => {
     try {
       if (editingProduct?.id) {
         const response = await updateProduct(editingProduct.id, payload);
-        const updated = normalizeProduct(response?.product || { ...editingProduct, ...payload });
+        const updated = normalizeProduct({ ...editingProduct, ...payload, ...(response?.product || {}) });
         setProducts((prev) => prev.map((item) => (item.id === editingProduct.id ? updated : item)));
         toast({ title: 'Product updated', description: `${updated.displayName} has been updated.`, variant: 'success' });
       } else {
@@ -373,10 +378,11 @@ const AdminProductsPage = () => {
                         <div className="flex items-center gap-2">
                           <div
                             className={`h-1.5 w-1.5 rounded-full ${
-                              product.displayStock > 10 ? 'bg-emerald-500' : product.displayStock > 0 ? 'bg-amber-500' : 'bg-rose-500'
+                              product.displayStock > (product.stock_threshold ?? 5) ? 'bg-emerald-500' : product.displayStock > 0 ? 'bg-amber-500' : 'bg-rose-500'
                             }`}
                           />
-                          <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock</p>
+                          <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock 
+                            <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(Alert: {product.stock_threshold ?? 5})</span></p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -482,18 +488,34 @@ const AdminProductsPage = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="product-stock">Stock</Label>
-              <Input
-                id="product-stock"
-                type="number"
-                min="0"
-                step="1"
-                value={form.stock}
-                onChange={(event) => updateFormField('stock', event.target.value)}
-                placeholder="0"
-                required
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="product-stock">Current Stock</Label>
+                <Input
+                  id="product-stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.stock}
+                  onChange={(event) => updateFormField('stock', event.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="product-threshold">Stock Alert Threshold</Label>
+                <Input
+                  id="product-threshold"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.stockThreshold}
+                  onChange={(event) => updateFormField('stockThreshold', event.target.value)}
+                  placeholder="5"
+                  required
+                />
+              </div>
             </div>
 
             <div className="space-y-2">

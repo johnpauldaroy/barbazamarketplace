@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminStoreController;
 use App\Http\Controllers\AdminReviewController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicStoreController;
 use App\Http\Controllers\StoreInquiryController;
@@ -44,6 +45,8 @@ Route::get('/categories', [ProductController::class, 'categories']);
 Route::get('/stores', [PublicStoreController::class, 'index']);
 Route::get('/stores/{slug}', [PublicStoreController::class, 'show']);
 Route::post('/stores/{slug}/inquiries', [StoreInquiryController::class, 'store'])->middleware('throttle:8,1');
+Route::get('/feedback-links/{token}', [OrderFeedbackController::class, 'show'])->middleware('throttle:30,1');
+Route::post('/feedback-links/{token}/submit', [OrderFeedbackController::class, 'submit'])->middleware('throttle:10,1');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

@@ -45,6 +45,7 @@ class MerchantStoreController extends Controller
             'cover_image' => 'nullable|string|max:2048',
             'logo_image_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'cover_image_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'facebook_url' => 'nullable|url|max:2048',
         ]);
 
         if (array_key_exists('name', $payload)) {
@@ -93,6 +94,9 @@ class MerchantStoreController extends Controller
         if (array_key_exists('cover_image', $payload)) {
             $store->cover_image = $this->normalizeNullableString($payload['cover_image']);
         }
+        if (array_key_exists('facebook_url', $payload)) {
+            $store->facebook_url = $this->normalizeNullableString($payload['facebook_url']);
+        }
         if ($request->hasFile('logo_image_file')) {
             $this->removeManagedStoreImage($store->logo_image);
             $store->logo_image = $this->storeImageFile($request->file('logo_image_file'), 'stores/logo');
@@ -128,6 +132,7 @@ class MerchantStoreController extends Controller
             'country' => $store->country,
             'logo_image' => $this->toImageUrl($store->logo_image),
             'cover_image' => $this->toImageUrl($store->cover_image),
+            'facebook_url' => $store->facebook_url,
             'created_at' => optional($store->created_at)->toISOString(),
             'updated_at' => optional($store->updated_at)->toISOString(),
         ];

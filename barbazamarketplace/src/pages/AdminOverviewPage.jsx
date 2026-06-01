@@ -1,32 +1,38 @@
 import React, { useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   Activity,
-  Package,
-  ShoppingCart,
-  Users,
-  DollarSign
+  CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
+
+const DATE_RANGE_OPTIONS = [
+  { value: 'today',      label: 'Today' },
+  { value: 'this_week',  label: 'This Week' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'this_year',  label: 'This Year' },
+  { value: 'custom',     label: 'Custom' },
+];
 
 const AdminOverviewPage = () => {
-  const { summary, salesTrend, recentActivities, formatPeso, refreshing, lastSync, onRefresh, dashboard } = useOutletContext();
+  const {
+    summary, statTiles, salesTrend, recentActivities, formatPeso, refreshing, lastSync, onRefresh, dashboard,
+    dateRange, setDateRange, customFrom, setCustomFrom, customTo, setCustomTo,
+  } = useOutletContext();
   const PIE_COLORS = ['#2954C8', '#2EA7FF', '#12B981', '#F6C343', '#FF5A75', '#94A3B8'];
   const categoryData = useMemo(() => {
     const breakdown = dashboard?.category_breakdown;
@@ -40,49 +46,11 @@ const AdminOverviewPage = () => {
     return [];
   }, [dashboard]);
 
-  const statTiles = [
-    { 
-      title: 'Gross Revenue', 
-      value: formatPeso(summary.total_revenue), 
-      icon: DollarSign, 
-      trend: 12.5,
-      meta: 'v.s. last month',
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-600'
-    },
-    { 
-      title: 'Total Orders', 
-      value: summary.total_orders || 0, 
-      icon: ShoppingCart, 
-      trend: 8.2,
-      meta: '2 pending today',
-      iconBg: 'bg-amber-50',
-      iconColor: 'text-amber-600'
-    },
-    { 
-      title: 'Customers', 
-      value: summary.unique_customers || 0, 
-      icon: Users, 
-      trend: 15.4,
-      meta: '3 new this week',
-      iconBg: 'bg-emerald-50',
-      iconColor: 'text-emerald-600'
-    },
-    { 
-      title: 'Avg. Order', 
-      value: formatPeso(summary.avg_order_value), 
-      icon: Package, 
-      trend: -2.4,
-      meta: 'Steady growth',
-      iconBg: 'bg-rose-50',
-      iconColor: 'text-rose-600'
-    },
-  ];
 
   return (
     <div className="space-y-6">
-      {/* Live sync indicator */}
-      <div className="flex items-center justify-between">
+      {/* Header + filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-800">Overview</h1>
           {lastSync && (
@@ -92,20 +60,63 @@ const AdminOverviewPage = () => {
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          <TrendingUp className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date range pills */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+            <CalendarDays className="ml-1 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            {DATE_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDateRange(opt.value)}
+                className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+                  dateRange === opt.value
+                    ? 'bg-[#2954C8] text-white shadow'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom date inputs */}
+          {dateRange === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2954C8]/30"
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2954C8]/30"
+              />
+            </div>
+          )}
+
+          {/* Refresh */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            <TrendingUp className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       <section id="stats" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {statTiles.map((item, index) => {
           const Icon = item.icon;
+          const hasTrend = item.trend !== null && item.trend !== undefined;
           const isPositive = item.trend >= 0;
           return (
             <motion.div
@@ -118,11 +129,17 @@ const AdminOverviewPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.iconBg}`}>
-                      <Icon className={`h-4 w-4 ${item.iconColor}`} />
+                      {item.pesoIcon
+                        ? <span className={`text-base font-extrabold ${item.iconColor}`}>₱</span>
+                        : <Icon className={`h-4 w-4 ${item.iconColor}`} />}
                     </div>
-                    {item.trend !== undefined && (
+                    {hasTrend ? (
                       <div className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                         {isPositive ? '↑' : '↓'} {Math.abs(item.trend).toFixed(1)}%
+                      </div>
+                    ) : (
+                      <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-400">
+                        — vs prev
                       </div>
                     )}
                   </div>
@@ -144,10 +161,6 @@ const AdminOverviewPage = () => {
               <div>
                 <CardTitle className="text-xl font-bold text-slate-800">Sales Trend</CardTitle>
                 <p className="text-xs text-slate-500">Revenue growth over time</p>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="cursor-pointer border-slate-200 bg-white px-3 py-1 text-xs hover:bg-slate-50">7D</Badge>
-                <Badge className="cursor-pointer bg-[#2954C8] px-3 py-1 text-xs">30D</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -233,15 +246,6 @@ const AdminOverviewPage = () => {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none bg-[#2954C8] text-white shadow-xl">
-            <CardContent className="p-6">
-              <TrendingUp className="h-8 w-8 text-white/50" />
-              <h3 className="mt-4 text-xl font-bold">Growth Strategy</h3>
-              <p className="mt-2 text-xs text-white/70">Category performance is up 12%. Focus on Fashion for the next quarter.</p>
-              <Button className="mt-5 w-full bg-white text-[#2954C8] hover:bg-white/90">Analyze More</Button>
             </CardContent>
           </Card>
         </section>

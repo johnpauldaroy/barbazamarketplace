@@ -215,7 +215,10 @@ export const updateOrderStatus = async (id, status) => {
     }
 };
 
-export const getAdminDashboard = async () => apiRequest('/admin/dashboard');
+export const getAdminDashboard = async (params = {}) => {
+    const qs = buildQueryString(params);
+    return apiRequest(`/admin/dashboard${qs}`);
+};
 
 export const fetchMerchantOrders = async (params = {}) => {
     return apiRequest(`/merchant/orders${buildQueryString(params)}`);
@@ -594,6 +597,23 @@ export const reportProductReview = async (reviewId, payload) => {
         });
     } catch (error) {
         console.error('Report product review error:', error);
+        throw error;
+    }
+};
+
+// Order feedback (token-gated) APIs
+export const fetchOrderFeedbackLink = async (token) => {
+    return apiRequest(`/feedback-links/${encodeURIComponent(token)}`);
+};
+
+export const submitOrderFeedback = async (token, payload) => {
+    try {
+        return await apiRequest(`/feedback-links/${encodeURIComponent(token)}/submit`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Submit order feedback error:', error);
         throw error;
     }
 };

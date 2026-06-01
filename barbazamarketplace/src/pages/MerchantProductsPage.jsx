@@ -213,12 +213,8 @@ const MerchantProductsPage = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-xl font-bold text-slate-800">My Products</CardTitle>
-            <p className="text-sm text-slate-500">Manage products in your own merchant store.</p>
+            <p className="text-sm text-slate-500">View products in your store. Product management is currently restricted to administrators.</p>
           </div>
-          <Button className="gap-2 text-xs font-bold rounded-xl bg-[#2954C8]" onClick={openAddDialog}>
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex gap-4">
@@ -241,7 +237,7 @@ const MerchantProductsPage = () => {
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Category</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Price</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Stock</th>
-                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Access</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#ECF1FA]">
@@ -281,14 +277,7 @@ const MerchantProductsPage = () => {
                         <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock</p>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => openEditDialog(product)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => openDeleteDialog(product)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <span className="text-[10px] font-medium text-slate-400 italic">View Only</span>
                       </td>
                     </tr>
                   ))
@@ -435,4 +424,3 @@ const MerchantProductsPage = () => {
 };
 
 export default MerchantProductsPage;
-

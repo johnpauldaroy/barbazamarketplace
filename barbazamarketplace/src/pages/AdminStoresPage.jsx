@@ -26,6 +26,7 @@ const INITIAL_STORE_FORM = {
   cover_image: '',
   logo_image_file: null,
   cover_image_file: null,
+  facebook_url: '',
 };
 
 const INITIAL_MERCHANT_FORM = {
@@ -107,6 +108,7 @@ const AdminStoresPage = () => {
       cover_image: store?.cover_image || '',
       logo_image_file: null,
       cover_image_file: null,
+      facebook_url: store?.facebook_url || '',
     });
     setIsStoreDialogOpen(true);
   };
@@ -138,6 +140,7 @@ const AdminStoresPage = () => {
       province: optionalValue(storeForm.province),
       postal_code: optionalValue(storeForm.postal_code),
       country: optionalValue(storeForm.country),
+      facebook_url: optionalValue(storeForm.facebook_url),
     };
     if (storeForm.logo_image_file instanceof File) {
       payload.logo_image_file = storeForm.logo_image_file;
@@ -369,6 +372,17 @@ const AdminStoresPage = () => {
                   onChange={(event) => setStoreForm((prev) => ({ ...prev, contact_phone: event.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="store-facebook-url">Facebook / Messenger Link</Label>
+              <Input
+                id="store-facebook-url"
+                type="url"
+                placeholder="https://facebook.com/yourpage or https://m.me/yourpage"
+                value={storeForm.facebook_url}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, facebook_url: event.target.value }))}
+              />
             </div>
 
             <div className="space-y-2">
