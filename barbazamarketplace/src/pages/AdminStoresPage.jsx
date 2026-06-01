@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
-import { createAdminStore, createStoreMerchant, deactivateAdminStore, fetchAdminStores, updateAdminStore } from '../api/EcommerceApi';
+import { activateAdminStore, createAdminStore, createStoreMerchant, deactivateAdminStore, fetchAdminStores, updateAdminStore } from '../api/EcommerceApi';
 import Pagination from '../components/ui/Pagination';
 
 const PAGE_SIZE = 10;
@@ -207,13 +207,18 @@ const AdminStoresPage = () => {
     }
   };
 
-  const handleDeactivateStore = async (store) => {
+  const handleToggleStoreStatus = async (store) => {
     setIsMutating(true);
+    const isActive = store.status === 'active';
     try {
-      await deactivateAdminStore(store.id);
+      if (isActive) {
+        await deactivateAdminStore(store.id);
+      } else {
+        await activateAdminStore(store.id);
+      }
       toast({
-        title: 'Store deactivated',
-        description: `${store.name} is now inactive.`,
+        title: isActive ? 'Store deactivated' : 'Store activated',
+        description: `${store.name} is now ${isActive ? 'inactive' : 'active'}.`,
         variant: 'success',
       });
       await loadStores();
@@ -302,7 +307,15 @@ const AdminStoresPage = () => {
                           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" onClick={() => openMerchantDialog(store)}>
                             <UserPlus className="h-4 w-4" />
                           </Button>
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivateStore(store)} disabled={isMutating || store.status === 'inactive'}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title={store.status === 'active' ? 'Deactivate store' : 'Activate store'}
+                            className={`h-8 w-8 ${store.status === 'active' ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                            onClick={() => handleToggleStoreStatus(store)}
+                            disabled={isMutating}
+                          >
                             <Power className="h-4 w-4" />
                           </Button>
                         </div>

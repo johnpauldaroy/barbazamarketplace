@@ -220,6 +220,11 @@ export const getAdminDashboard = async (params = {}) => {
     return apiRequest(`/admin/dashboard${qs}`);
 };
 
+export const fetchAdminReports = async (params = {}) => {
+    const qs = buildQueryString(params);
+    return apiRequest(`/admin/reports${qs}`);
+};
+
 export const fetchMerchantOrders = async (params = {}) => {
     return apiRequest(`/merchant/orders${buildQueryString(params)}`);
 };
@@ -318,6 +323,18 @@ export const updateProduct = async (id, productData) => {
     }
 };
 
+export const bulkImportProducts = async (products) => {
+    try {
+        return await apiRequest('/products/bulk-import', {
+            method: 'POST',
+            body: JSON.stringify({ products }),
+        });
+    } catch (error) {
+        console.error('Bulk import error:', error);
+        throw error;
+    }
+};
+
 export const deleteProduct = async (id) => {
     try {
         return await apiRequest(`/products/${id}`, { method: 'DELETE' });
@@ -402,11 +419,21 @@ export const updateAdminStore = async (storeId, payload) => {
 
 export const deactivateAdminStore = async (storeId) => {
     try {
-        return await apiRequest(`/admin/stores/${storeId}`, {
-            method: 'DELETE',
-        });
+        return await apiRequest(`/admin/stores/${storeId}`, { method: 'DELETE' });
     } catch (error) {
         console.error('Deactivate admin store error:', error);
+        throw error;
+    }
+};
+
+export const activateAdminStore = async (storeId) => {
+    try {
+        return await apiRequest(`/admin/stores/${storeId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'active' }),
+        });
+    } catch (error) {
+        console.error('Activate admin store error:', error);
         throw error;
     }
 };

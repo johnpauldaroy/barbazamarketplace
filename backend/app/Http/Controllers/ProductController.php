@@ -215,6 +215,56 @@ class ProductController extends Controller
         ]);
     }
 
+    public function bulkImport(Request $request)
+    {
+        $request->validate([
+            'products'          => 'required|array|min:1|max:500',
+            'products.*.title'    => 'required|string|max:255',
+            'products.*.price'    => 'required|numeric|min:0',
+            'products.*.category' => 'required|string|max:100',
+            'products.*.stock'    => 'required|integer|min:0',
+            'products.*.description' => 'nullable|string',
+            'products.*.store_id'    => 'nullable|integer|exists:stores,id',
+        ]);
+
+        $defaultStoreId = Store::ensurePlatformStore()->id;
+        $created = [];
+        $errors  = [];
+
+        foreach ($request->products as $index => $row) {
+            try {
+                $storeId = isset($row['store_id']) && $row['store_id']
+                    ? (int) $row['store_id']
+                    : $defaultStoreId;
+
+                $this->ensureCategoryExists($row['category'], $storeId);
+
+                $product = Product::create([
+                    'title'       => trim($row['title']),
+                    'description' => $row['description'] ?? null,
+                    'price'       => $row['price'],
+                    'category'    => $row['category'],
+                    'stock'       => $row['stock'],
+                    'store_id'    => $storeId,
+                    'image'       => null,
+                ]);
+
+                $product->load('store');
+                $created[] = $this->formatProduct($product);
+            } catch (\Throwable $e) {
+                $errors[] = ['row' => $index + 1, 'title' => $row['title'] ?? '?', 'error' => $e->getMessage()];
+            }
+        }
+
+        return response()->json([
+            'message' => count($created) . ' product(s) imported successfully.',
+            'imported' => count($created),
+            'failed'   => count($errors),
+            'products' => $created,
+            'errors'   => $errors,
+        ], 201);
+    }
+
     public function destroy($id)
     {
         $product = Product::findOrFail($id);

@@ -65,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin product management routes
     Route::middleware('admin')->group(function () {
         Route::get('/admin/dashboard', [OrderController::class, 'adminSummary']);
+        Route::get('/admin/reports', [OrderController::class, 'adminReports']);
         Route::get('/admin/users', [AdminUserController::class, 'index']);
         Route::post('/admin/users', [AdminUserController::class, 'store']);
         Route::put('/admin/users/{id}', [AdminUserController::class, 'update']);
@@ -77,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admin/merchants/{userId}', [AdminStoreController::class, 'updateMerchant']);
         Route::post('/categories', [ProductController::class, 'storeCategory']);
         Route::post('/products', [ProductController::class, 'store']);
+        Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
         Route::get('/admin/reviews', [AdminReviewController::class, 'index']);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, Download, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
-import { createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
+import { bulkImportProducts, createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
 import Pagination from '../components/ui/Pagination';
 
@@ -58,6 +58,13 @@ const AdminProductsPage = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [deletingProduct, setDeletingProduct] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+
+  // Bulk import state
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkResult, setBulkResult] = useState(null);
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
 
   const loadProducts = useCallback(async () => {
     setIsLoadingProducts(true);
@@ -190,6 +197,81 @@ const AdminProductsPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const CSV_TEMPLATE = 'title,category,price,stock,description,store_id\nSample Product,Local Food Products,99,50,Optional description,\n';
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products_import_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvFile = (e) => {
+    setBulkError('');
+    setBulkResult(null);
+    setBulkRows([]);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) { setBulkError('CSV must have a header row and at least one data row.'); return; }
+
+        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+        const required = ['title', 'category', 'price', 'stock'];
+        const missing = required.filter((r) => !headers.includes(r));
+        if (missing.length) { setBulkError(`Missing required columns: ${missing.join(', ')}`); return; }
+
+        const rows = lines.slice(1).map((line, i) => {
+          const values = line.split(',').map((v) => v.trim());
+          const row = {};
+          headers.forEach((h, idx) => { row[h] = values[idx] ?? ''; });
+          return {
+            _line: i + 2,
+            title: row.title,
+            category: row.category,
+            price: parseFloat(row.price) || 0,
+            stock: parseInt(row.stock, 10) || 0,
+            description: row.description || null,
+            store_id: row.store_id ? parseInt(row.store_id, 10) : null,
+            _valid: Boolean(row.title && row.category && row.price > 0),
+          };
+        });
+
+        if (rows.every((r) => !r._valid)) { setBulkError('No valid rows found. Check that title, category and price are filled.'); return; }
+        setBulkRows(rows);
+      } catch {
+        setBulkError('Failed to parse CSV file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleBulkImport = async () => {
+    const validRows = bulkRows.filter((r) => r._valid).map(({ _line, _valid, ...rest }) => rest);
+    if (!validRows.length) return;
+    setIsBulkImporting(true);
+    try {
+      const result = await bulkImportProducts(validRows);
+      setBulkResult(result);
+      if (result.imported > 0) {
+        loadProducts();
+        toast({ title: `${result.imported} product(s) imported`, variant: 'success' });
+      }
+    } catch (err) {
+      setBulkError(err?.message || 'Import failed.');
+    } finally {
+      setIsBulkImporting(false);
+    }
+  };
+
   const updateFormField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -296,10 +378,16 @@ const AdminProductsPage = () => {
             <CardTitle className="text-xl font-bold text-slate-800">Product Catalog</CardTitle>
             <p className="text-sm text-slate-500">Manage your marketplace inventory</p>
           </div>
-          <Button className="gap-2 text-xs font-bold rounded-xl bg-[#2954C8]" onClick={openAddDialog}>
-            <Plus className="h-4 w-4" />
-            Add New Product
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2 text-xs font-bold rounded-xl" onClick={() => { setBulkRows([]); setBulkError(''); setBulkResult(null); setIsBulkDialogOpen(true); }}>
+              <Upload className="h-4 w-4" />
+              Bulk Import
+            </Button>
+            <Button className="gap-2 text-xs font-bold rounded-xl bg-[#2954C8]" onClick={openAddDialog}>
+              <Plus className="h-4 w-4" />
+              Add New Product
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex flex-wrap gap-4">
@@ -601,6 +689,129 @@ const AdminProductsPage = () => {
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={isMutating}>
               {isMutating ? 'Deleting...' : 'Delete Product'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={isBulkDialogOpen} onOpenChange={(open) => { setIsBulkDialogOpen(open); if (!open) { setBulkRows([]); setBulkError(''); setBulkResult(null); } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-[#2954C8]" />
+              Bulk Import Products
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import multiple products at once.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Template download */}
+            <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Download template</p>
+                <p className="text-xs text-slate-500">Required columns: title, category, price, stock. Optional: description, store_id</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={downloadTemplate}>
+                <Download className="h-3.5 w-3.5" />
+                Template CSV
+              </Button>
+            </div>
+
+            {/* File picker */}
+            {!bulkResult && (
+              <div>
+                <Label className="mb-1.5 block text-xs font-semibold text-slate-600">Select CSV file</Label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleCsvFile}
+                  className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-[#eef3fb] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[#2954C8] hover:file:bg-[#dce8fb]"
+                />
+              </div>
+            )}
+
+            {/* Error */}
+            {bulkError && (
+              <div className="flex items-start gap-2 rounded-lg bg-rose-50 p-3 text-xs text-rose-700">
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                {bulkError}
+              </div>
+            )}
+
+            {/* Result summary */}
+            {bulkResult && (
+              <div className={`flex items-start gap-2 rounded-lg p-3 text-xs ${bulkResult.failed === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">{bulkResult.message}</p>
+                  {bulkResult.errors?.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                      {bulkResult.errors.map((e, i) => (
+                        <li key={i}>Row {e.row} ({e.title}): {e.error}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Preview table */}
+            {bulkRows.length > 0 && !bulkResult && (
+              <div>
+                <p className="mb-2 text-xs font-semibold text-slate-600">
+                  Preview — {bulkRows.filter(r => r._valid).length} valid / {bulkRows.length} total rows
+                </p>
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold text-slate-500">#</th>
+                        <th className="px-3 py-2 font-semibold text-slate-500">Title</th>
+                        <th className="px-3 py-2 font-semibold text-slate-500">Category</th>
+                        <th className="px-3 py-2 font-semibold text-slate-500">Price</th>
+                        <th className="px-3 py-2 font-semibold text-slate-500">Stock</th>
+                        <th className="px-3 py-2 font-semibold text-slate-500">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {bulkRows.map((row) => (
+                        <tr key={row._line} className={row._valid ? '' : 'bg-rose-50'}>
+                          <td className="px-3 py-2 text-slate-400">{row._line}</td>
+                          <td className="px-3 py-2 font-medium text-slate-700">{row.title || <span className="text-rose-400">missing</span>}</td>
+                          <td className="px-3 py-2 text-slate-600">{row.category || <span className="text-rose-400">missing</span>}</td>
+                          <td className="px-3 py-2 text-slate-600">₱{row.price}</td>
+                          <td className="px-3 py-2 text-slate-600">{row.stock}</td>
+                          <td className="px-3 py-2">
+                            {row._valid
+                              ? <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle className="h-3 w-3" />Valid</span>
+                              : <span className="inline-flex items-center gap-1 text-rose-500"><XCircle className="h-3 w-3" />Invalid</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsBulkDialogOpen(false)}>
+              {bulkResult ? 'Close' : 'Cancel'}
+            </Button>
+            {bulkRows.length > 0 && !bulkResult && (
+              <Button
+                type="button"
+                className="bg-[#2954C8] gap-2"
+                disabled={isBulkImporting || bulkRows.filter(r => r._valid).length === 0}
+                onClick={handleBulkImport}
+              >
+                <Upload className="h-4 w-4" />
+                {isBulkImporting ? 'Importing…' : `Import ${bulkRows.filter(r => r._valid).length} Products`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

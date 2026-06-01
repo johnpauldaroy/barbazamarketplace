@@ -6,6 +6,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderFeedbackLink;
 use App\Models\Product;
+use App\Models\Store;
+use App\Models\User;
 use App\Mail\OrderFeedbackInvitation;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -242,6 +244,156 @@ class OrderController extends Controller
                 'revenue' => round($monthOrders->sum(fn (Order $o) => (float) $o->total_amount), 2),
             ];
         })->values();
+    }
+
+    public function adminReports(Request $request)
+    {
+        $from     = $request->query('from');
+        $to       = $request->query('to');
+        $storeId  = $request->query('store_id');
+        $status   = $request->query('status');
+        $category = $request->query('category');
+
+        // Base order query
+        $orderQuery = Order::with(['items.product.store', 'user'])->latest();
+        if ($from)    $orderQuery->whereDate('created_at', '>=', $from);
+        if ($to)      $orderQuery->whereDate('created_at', '<=', $to);
+        if ($status && $status !== 'all') $orderQuery->where('status', $status);
+        if ($storeId) {
+            $orderQuery->whereHas('items.product', fn (Builder $q) => $q->where('store_id', $storeId));
+        }
+        $orders = $orderQuery->get();
+
+        $revenueOrders = $orders->filter(fn (Order $o) => !$this->isInventoryRestored($o->status));
+        $totalRevenue  = $revenueOrders->sum(fn (Order $o) => (float) $o->total_amount);
+        $totalOrders   = $orders->count();
+        $avgOrderValue = $revenueOrders->count() > 0 ? round($totalRevenue / $revenueOrders->count(), 2) : 0;
+
+        // Unique customers
+        $uniqueCustomers = $orders
+            ->map(fn (Order $o) => strtolower($o->customer_email ?: optional($o->user)->email ?: "guest-{$o->id}"))
+            ->filter()->unique()->count();
+
+        // Sales trend (auto-granularity)
+        $salesTrend = $this->buildSalesTrend($revenueOrders, $from, $to);
+
+        // Revenue by store
+        $revenueByStore = $revenueOrders
+            ->flatMap(fn (Order $o) => $o->items)
+            ->filter(fn ($item) => $item->product && $item->product->store)
+            ->when($storeId, fn ($c) => $c->filter(fn ($i) => (string)$i->product->store_id === (string)$storeId))
+            ->groupBy(fn ($item) => $item->product->store->name ?? 'Unknown')
+            ->map(fn ($items, $name) => [
+                'store'   => $name,
+                'revenue' => round($items->sum(fn ($i) => (float)$i->price * $i->quantity), 2),
+                'orders'  => $items->pluck('order_id')->unique()->count(),
+                'units'   => $items->sum('quantity'),
+            ])
+            ->sortByDesc('revenue')
+            ->values();
+
+        // Top products
+        $productSalesQuery = OrderItem::query()
+            ->select('product_id',
+                DB::raw('SUM(quantity) as units_sold'),
+                DB::raw('SUM(quantity * price) as revenue'))
+            ->groupBy('product_id');
+        if ($from || $to || $storeId || ($status && $status !== 'all')) {
+            $productSalesQuery->whereHas('order', function (Builder $q) use ($from, $to, $status) {
+                if ($from)   $q->whereDate('created_at', '>=', $from);
+                if ($to)     $q->whereDate('created_at', '<=', $to);
+                if ($status && $status !== 'all') $q->where('status', $status);
+            });
+        }
+        if ($storeId) {
+            $productSalesQuery->whereHas('product', fn (Builder $q) => $q->where('store_id', $storeId));
+        }
+        if ($category) {
+            $productSalesQuery->whereHas('product', fn (Builder $q) => $q->where('category', $category));
+        }
+        $productSales = $productSalesQuery->get()->keyBy('product_id');
+
+        $productQuery = Product::query()->with('store');
+        if ($storeId)  $productQuery->where('store_id', $storeId);
+        if ($category) $productQuery->where('category', $category);
+        $products = $productQuery->get();
+
+        $topProducts = $products->map(fn (Product $p) => [
+            'id'         => $p->id,
+            'title'      => $p->title,
+            'category'   => $p->category,
+            'store'      => optional($p->store)->name ?? 'N/A',
+            'stock'      => (int) $p->stock,
+            'units_sold' => (int) ($productSales->get($p->id)?->units_sold ?? 0),
+            'revenue'    => round((float) ($productSales->get($p->id)?->revenue ?? 0), 2),
+            'image_url'  => $p->image_url,
+        ])->sortByDesc('units_sold')->take(10)->values();
+
+        // Category performance
+        $categoryPerformance = $productSales->map(function ($sale) use ($products) {
+            $product = $products->firstWhere('id', $sale->product_id);
+            return [
+                'category' => $product?->category ?? 'Unknown',
+                'units'    => (int) $sale->units_sold,
+                'revenue'  => round((float) $sale->revenue, 2),
+            ];
+        })->groupBy('category')->map(fn ($rows, $cat) => [
+            'category' => $cat,
+            'units'    => $rows->sum('units'),
+            'revenue'  => round($rows->sum('revenue'), 2),
+        ])->sortByDesc('revenue')->values();
+
+        // Order status breakdown
+        $statusBreakdown = collect(self::STATUS_FLOW)->map(fn ($s) => [
+            'status' => $s,
+            'name'   => ucfirst($s),
+            'count'  => $orders->where('status', $s)->count(),
+        ])->filter(fn ($i) => $i['count'] > 0)->values();
+
+        // New customers over time (by registration date)
+        $customerQuery = User::query()->where('is_admin', false)->where('is_merchant', false);
+        if ($from) $customerQuery->whereDate('created_at', '>=', $from);
+        if ($to)   $customerQuery->whereDate('created_at', '<=', $to);
+        $newCustomers = $customerQuery->get()
+            ->groupBy(fn (User $u) => optional($u->created_at)->format('Y-m-d') ?? 'N/A')
+            ->map(fn ($g, $date) => ['date' => $date, 'count' => $g->count()])
+            ->sortBy('date')->values();
+
+        // Low stock products
+        $lowStock = $products->filter(fn (Product $p) => (int)$p->stock <= 10)
+            ->sortBy('stock')->take(10)
+            ->map(fn (Product $p) => [
+                'id'       => $p->id,
+                'title'    => $p->title,
+                'category' => $p->category,
+                'store'    => optional($p->store)->name ?? 'N/A',
+                'stock'    => (int) $p->stock,
+            ])->values();
+
+        // Available filter options
+        $stores     = Store::query()->orderBy('name')->get(['id', 'name']);
+        $categories = Product::query()->select('category')->distinct()->orderBy('category')->pluck('category');
+
+        return response()->json([
+            'summary' => [
+                'total_revenue'    => round($totalRevenue, 2),
+                'total_orders'     => $totalOrders,
+                'avg_order_value'  => $avgOrderValue,
+                'unique_customers' => $uniqueCustomers,
+            ],
+            'sales_trend'          => $salesTrend,
+            'revenue_by_store'     => $revenueByStore,
+            'top_products'         => $topProducts,
+            'category_performance' => $categoryPerformance,
+            'status_breakdown'     => $statusBreakdown,
+            'new_customers'        => $newCustomers,
+            'low_stock'            => $lowStock,
+            'filter_options'       => [
+                'stores'     => $stores,
+                'categories' => $categories,
+                'statuses'   => self::STATUS_FLOW,
+            ],
+        ]);
     }
 
     public function updateStatus(Request $request, $id)
