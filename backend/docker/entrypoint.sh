@@ -37,6 +37,13 @@ fi
 if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
   echo "Running migrations..."
   php artisan migrate --force
+
+  # Seed only on a fresh DB (no users yet)
+  USER_COUNT=$(php artisan tinker --execute="echo \App\Models\User::count();" 2>/dev/null | tail -1)
+  if [ "$USER_COUNT" = "0" ]; then
+    echo "Fresh database detected — seeding initial data..."
+    php artisan db:seed --force
+  fi
 else
   echo "Skipping migrations (RUN_MIGRATIONS=0)"
 fi
