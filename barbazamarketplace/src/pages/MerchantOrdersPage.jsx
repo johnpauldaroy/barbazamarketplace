@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Filter, Package, Search, Eye } from 'lucide-react';
-import Pagination from '../components/ui/Pagination';
-const PAGE_SIZE = 10;
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -10,6 +8,9 @@ import { Input } from '../components/ui/input';
 import { useToast } from '../components/ui/use-toast';
 import { fetchMerchantOrders, updateMerchantOrderStatus } from '../api/EcommerceApi';
 import { formatPeso } from '../lib/marketplace';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const ORDER_STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 const STATUS_VARIANTS = {

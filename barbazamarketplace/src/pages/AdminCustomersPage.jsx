@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Pagination from '../components/ui/Pagination';
-const PAGE_SIZE = 10;
 import { Search, UserPlus, Mail, Shield, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -10,6 +8,9 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
 import { createAdminUser, deleteAdminUser, fetchAdminUsers, updateAdminUser } from '../api/EcommerceApi';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const INITIAL_FORM = {
   name: '',

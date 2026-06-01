@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, Store, UserPlus, Edit, Power } from 'lucide-react';
-import Pagination from '../components/ui/Pagination';
-const PAGE_SIZE = 10;
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -10,6 +8,9 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
 import { createAdminStore, createStoreMerchant, deactivateAdminStore, fetchAdminStores, updateAdminStore } from '../api/EcommerceApi';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const INITIAL_STORE_FORM = {
   name: '',

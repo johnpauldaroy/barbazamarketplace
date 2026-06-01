@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import Pagination from '../components/ui/Pagination';
-
-const PAGE_SIZE = 10;
 import { Search, Filter, Download, Package, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const AdminOrdersPage = () => {
   const { 

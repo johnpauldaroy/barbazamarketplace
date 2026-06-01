@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Pagination from '../components/ui/Pagination';
-const PAGE_SIZE = 10;
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -12,6 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '../components/ui/use-toast';
 import { createMerchantProduct, deleteMerchantProduct, fetchMerchantCategories, fetchMerchantProducts, updateMerchantProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
+import Pagination from '../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 const INITIAL_FORM = {
   title: '',
