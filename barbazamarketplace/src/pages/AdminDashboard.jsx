@@ -87,7 +87,7 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
-  const [dateRange, setDateRange] = useState('this_month');
+  const [dateRange, setDateRange] = useState('this_year');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const hasLoadedRef = useRef(false);
@@ -276,6 +276,10 @@ const AdminDashboard = () => {
     lastSync,
     onRefresh: () => loadDashboard(true),
     dashboard,
+    topProducts,
+    lowStockProducts,
+    statusBreakdown,
+    recentOrders,
   };
 
   return (
