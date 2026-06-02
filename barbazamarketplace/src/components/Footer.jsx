@@ -17,6 +17,10 @@ const ACCOUNT_LINKS = [
   { to: '/cart', label: 'Shopping cart' },
 ];
 
+const LEGAL_LINKS = [
+  { to: '/privacy-policy', label: 'Privacy Policy' },
+];
+
 const TRUST_BADGES = [
   { icon: ShieldCheck, label: 'Verified cooperative products' },
   { icon: Truck, label: 'Community delivery network' },
@@ -130,15 +134,15 @@ const Footer = () => {
             <ul className="space-y-3 text-sm text-white/65">
               <li className="flex items-start gap-2.5">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#7ec8ff]" />
-                Barbaza, Antique, Philippines
+                Cubay, Barbaza, Antique, Philippines
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="h-4 w-4 shrink-0 text-[#7ec8ff]" />
-                (036) 123-4567
+                0919 065 4532
               </li>
               <li className="flex items-center gap-2.5">
                 <Mail className="h-4 w-4 shrink-0 text-[#7ec8ff]" />
-                info@barbazampc.coop
+                marketing@barbazampc.coop
               </li>
               <li className="flex items-start gap-2.5">
                 <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#7ec8ff]" />
@@ -159,7 +163,17 @@ const Footer = () => {
       <div className="border-t border-white/10">
         <div className="section flex flex-col gap-2 py-5 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {year} e-KoopMart · Barbaza Multi-Purpose Cooperative. All rights reserved.</p>
-          <p>Serving members and the community through trusted cooperative commerce.</p>
+          <div className="flex items-center gap-4">
+            {LEGAL_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="transition-colors hover:text-white/70"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

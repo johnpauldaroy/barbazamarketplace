@@ -20,9 +20,7 @@ const CONTACT_ITEMS = [
     title: 'Visit us',
     content: (
       <>
-        Main Street, Poblacion
-        <br />
-        Barbaza, Antique 5706
+        Cubay, Barbaza, Antique 5706
         <br />
         Philippines
       </>
@@ -33,9 +31,7 @@ const CONTACT_ITEMS = [
     title: 'Call us',
     content: (
       <>
-        (036) 123-4567
-        <br />
-        0917-123-4567
+        0919 065 4532
       </>
     ),
   },
@@ -44,9 +40,7 @@ const CONTACT_ITEMS = [
     title: 'Email us',
     content: (
       <>
-        info@barbazampc.coop
-        <br />
-        support@barbazampc.coop
+        marketing@barbazampc.coop
       </>
     ),
   },
@@ -264,7 +258,7 @@ const ContactPage = () => {
             </div>
             <h3 className="mt-5 text-3xl font-bold">Find us in Barbaza, Antique</h3>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-white/75">
-              Located in the heart of Poblacion and accessible from the main road, Barbaza MPC continues to serve members and the community with trusted cooperative support.
+              Located in Cubay, Barbaza MPC continues to serve members and the community with trusted cooperative support.
             </p>
           </CardContent>
         </Card>

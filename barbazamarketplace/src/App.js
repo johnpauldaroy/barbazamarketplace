@@ -41,6 +41,7 @@ const MerchantDashboard = lazy(() => import('./pages/MerchantDashboard'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 
 const RouteLoadingFallback = () => (
   <div className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
@@ -119,6 +120,7 @@ const AppRoutes = () =>
       ],
     },
     { path: '/success', element: <SuccessPage /> },
+    { path: '/privacy-policy', element: <PrivacyPolicyPage /> },
     { path: '*', element: <Navigate to="/" replace /> },
   ]);
 
