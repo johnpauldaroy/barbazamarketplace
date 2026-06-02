@@ -200,6 +200,36 @@ class MultiTenantMerchantTest extends TestCase
         $this->assertDatabaseHas('products', ['store_id' => $store->id, 'title' => 'Mango', 'category' => 'Fresh Fruits']);
     }
 
+    public function test_admin_can_rename_global_category_from_non_platform_products(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::create([
+            'name' => 'Local Producer',
+            'slug' => 'local-producer',
+            'status' => 'active',
+        ]);
+
+        Product::create([
+            'store_id' => $store->id,
+            'title' => 'Coconut',
+            'price' => 40,
+            'category' => 'Fresh Produce',
+            'stock' => 15,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/categories/Fresh%20Produce', [
+            'name' => 'Farm Produce',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('products', [
+            'store_id' => $store->id,
+            'title' => 'Coconut',
+            'category' => 'Farm Produce',
+        ]);
+    }
+
     public function test_admin_can_delete_unused_platform_category(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

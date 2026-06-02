@@ -157,9 +157,7 @@ class ProductController extends Controller
             ], 422);
         }
 
-        $storeId = isset($validated['store_id'])
-            ? (int) $validated['store_id']
-            : Store::ensurePlatformStore()->id;
+        $storeId = isset($validated['store_id']) ? (int) $validated['store_id'] : null;
 
         if (Str::lower($oldName) === Str::lower($newName)) {
             return response()->json([
@@ -168,26 +166,24 @@ class ProductController extends Controller
             ]);
         }
 
-        $oldCategory = $this->findCategoryByName($oldName, $storeId);
-        $targetCategory = $this->findCategoryByName($newName, $storeId);
+        $oldCategories = $this->categoryQueryByName($oldName, $storeId)->get();
         $productCount = $this->productCategoryQuery($oldName, $storeId)->count();
 
-        if (!$oldCategory && $productCount === 0) {
+        if ($oldCategories->isEmpty() && $productCount === 0) {
             return response()->json([
                 'message' => 'Category not found.',
             ], 404);
         }
 
-        DB::transaction(function () use ($oldCategory, $targetCategory, $oldName, $newName, $storeId) {
-            if ($targetCategory && $oldCategory && $targetCategory->id !== $oldCategory->id) {
-                $oldCategory->delete();
-            } elseif ($oldCategory) {
-                $oldCategory->update(['name' => $newName]);
-            } elseif (!$targetCategory) {
-                Category::create([
-                    'store_id' => $storeId,
-                    'name' => $newName,
-                ]);
+        DB::transaction(function () use ($oldCategories, $oldName, $newName, $storeId) {
+            foreach ($oldCategories as $oldCategory) {
+                $targetCategory = $this->findCategoryByName($newName, (int) $oldCategory->store_id);
+
+                if ($targetCategory && $targetCategory->id !== $oldCategory->id) {
+                    $oldCategory->delete();
+                } else {
+                    $oldCategory->update(['name' => $newName]);
+                }
             }
 
             $this->productCategoryQuery($oldName, $storeId)->update(['category' => $newName]);
@@ -212,9 +208,7 @@ class ProductController extends Controller
             ], 422);
         }
 
-        $storeId = isset($validated['store_id'])
-            ? (int) $validated['store_id']
-            : Store::ensurePlatformStore()->id;
+        $storeId = isset($validated['store_id']) ? (int) $validated['store_id'] : null;
 
         $productCount = $this->productCategoryQuery($categoryName, $storeId)->count();
         if ($productCount > 0) {
@@ -223,14 +217,14 @@ class ProductController extends Controller
             ], 409);
         }
 
-        $category = $this->findCategoryByName($categoryName, $storeId);
-        if (!$category) {
+        $categories = $this->categoryQueryByName($categoryName, $storeId)->get();
+        if ($categories->isEmpty()) {
             return response()->json([
                 'message' => 'Category not found.',
             ], 404);
         }
 
-        $category->delete();
+        $categories->each->delete();
 
         return response()->json([
             'message' => 'Category deleted successfully',
@@ -426,16 +420,20 @@ class ProductController extends Controller
 
     protected function findCategoryByName(string $name, int $storeId): ?Category
     {
-        return Category::query()
-            ->where('store_id', $storeId)
-            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
-            ->first();
+        return $this->categoryQueryByName($name, $storeId)->first();
     }
 
-    protected function productCategoryQuery(string $name, int $storeId): Builder
+    protected function categoryQueryByName(string $name, ?int $storeId = null): Builder
+    {
+        return Category::query()
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->whereRaw('LOWER(name) = ?', [Str::lower($name)]);
+    }
+
+    protected function productCategoryQuery(string $name, ?int $storeId = null): Builder
     {
         return Product::query()
-            ->where('store_id', $storeId)
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
             ->whereRaw('LOWER(category) = ?', [Str::lower($name)]);
     }
 
