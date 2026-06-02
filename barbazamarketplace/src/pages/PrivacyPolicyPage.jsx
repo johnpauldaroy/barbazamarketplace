@@ -159,11 +159,11 @@ const PrivacyPolicyPage = () => (
             </li>
             <li className="flex items-center gap-2.5">
               <Mail className="h-4 w-4 shrink-0 text-[#2954C8]" />
-              <a href="mailto:marketing@barbazampc.coop" className="text-[#2954C8] hover:underline">marketing@barbazampc.coop</a>
+              <a href="mailto:dpo@barbazampc.coop" className="text-[#2954C8] hover:underline">dpo@barbazampc.coop</a>
             </li>
             <li className="flex items-center gap-2.5">
               <Phone className="h-4 w-4 shrink-0 text-[#2954C8]" />
-              0919 065 4532
+              09067808830
             </li>
           </ul>
         </div>
