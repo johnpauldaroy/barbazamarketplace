@@ -420,6 +420,61 @@ const AdminSettingsPage = () => {
           </div>
         </div>
       </div>
+      {/* Add / Edit Admin Dialog */}
+      <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingUser ? 'Edit Admin' : 'Add Admin'}</DialogTitle>
+            <DialogDescription>
+              {editingUser ? 'Update admin account details.' : 'Create a new administrator account.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleUserSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="admin-name">Name</Label>
+              <Input id="admin-name" value={userForm.name} onChange={(e) => setUserForm((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-email">Email</Label>
+              <Input id="admin-email" type="email" value={userForm.email} onChange={(e) => setUserForm((p) => ({ ...p, email: e.target.value }))} placeholder="name@example.com" required />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="admin-password">Password {editingUser ? '(optional)' : ''}</Label>
+                <Input id="admin-password" type="password" value={userForm.password} onChange={(e) => setUserForm((p) => ({ ...p, password: e.target.value }))} placeholder={editingUser ? 'Leave blank to keep' : 'Min. 8 characters'} required={!editingUser} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-confirm">Confirm Password</Label>
+                <Input id="admin-confirm" type="password" value={userForm.password_confirmation} onChange={(e) => setUserForm((p) => ({ ...p, password_confirmation: e.target.value }))} placeholder="Repeat password" required={!editingUser || userForm.password.length > 0} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)} disabled={isMutatingUser}>Cancel</Button>
+              <Button type="submit" className="bg-[#2954C8]" disabled={isMutatingUser}>
+                {isMutatingUser ? 'Saving...' : editingUser ? 'Update Admin' : 'Create Admin'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Admin Dialog */}
+      <Dialog open={isDeleteUserDialogOpen} onOpenChange={setIsDeleteUserDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove Admin</DialogTitle>
+            <DialogDescription>
+              {deletingUser ? `Are you sure you want to remove "${deletingUser.name}" as admin? This cannot be undone.` : 'Are you sure?'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDeleteUserDialogOpen(false)} disabled={isMutatingUser}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={handleDeleteUser} disabled={isMutatingUser}>
+              {isMutatingUser ? 'Removing...' : 'Remove Admin'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
