@@ -72,9 +72,10 @@ const AdminCustomersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const filteredCustomers = useMemo(() => {
+    const members = users.filter((user) => !user.is_admin);
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return users;
-    return users.filter((user) =>
+    if (!query) return members;
+    return members.filter((user) =>
       [user?.name, user?.email].filter(Boolean).join(' ').toLowerCase().includes(query)
     );
   }, [users, searchQuery]);
@@ -233,7 +234,7 @@ const AdminCustomersPage = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-xl font-bold text-slate-800">Customer Management</CardTitle>
-            <p className="text-sm text-slate-500">View and manage registered marketplace users</p>
+            <p className="text-sm text-slate-500">View and manage registered marketplace members</p>
           </div>
           <Button className="gap-2 text-xs font-bold rounded-xl bg-[#2954C8]" onClick={openAddDialog}>
             <UserPlus className="h-4 w-4" />
@@ -374,7 +375,6 @@ const AdminCustomersPage = () => {
                 className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20"
               >
                 <option value="member">Member</option>
-                <option value="admin">Admin</option>
               </select>
             </div>
 

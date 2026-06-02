@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Save, Shield, Store, Globe, Tags, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Save, Shield, Store, Globe, Tags, Pencil, Trash2, Check, X, UserPlus, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
-import { createCategory, getCategories, updateCategory, deleteCategory } from '../api/EcommerceApi';
+import { createCategory, getCategories, updateCategory, deleteCategory, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../api/EcommerceApi';
+
+const INITIAL_USER_FORM = { name: '', email: '', password: '', password_confirmation: '' };
 
 const AdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -18,6 +22,98 @@ const AdminSettingsPage = () => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [deletingCategory, setDeletingCategory] = useState(null);
+
+  // Admin users
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
+  const [isMutatingUser, setIsMutatingUser] = useState(false);
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userForm, setUserForm] = useState(INITIAL_USER_FORM);
+  const [isDeleteUserDialogOpen, setIsDeleteUserDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(null);
+
+  const loadAdminUsers = useCallback(async () => {
+    setIsLoadingAdmins(true);
+    try {
+      const response = await fetchAdminUsers({ per_page: 100 });
+      const all = Array.isArray(response?.users) ? response.users : [];
+      setAdminUsers(all.filter((u) => u.is_admin));
+    } catch {
+      // silently fail — not critical
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAdminUsers(); }, [loadAdminUsers]);
+
+  const openAddUserDialog = () => {
+    setEditingUser(null);
+    setUserForm(INITIAL_USER_FORM);
+    setIsUserDialogOpen(true);
+  };
+
+  const openEditUserDialog = (user) => {
+    setEditingUser(user);
+    setUserForm({ name: user.name || '', email: user.email || '', password: '', password_confirmation: '' });
+    setIsUserDialogOpen(true);
+  };
+
+  const handleUserSubmit = async (e) => {
+    e.preventDefault();
+    const name = userForm.name.trim();
+    const email = userForm.email.trim();
+    if (!name || !email) {
+      toast({ title: 'Missing details', description: 'Name and email are required.', variant: 'destructive' });
+      return;
+    }
+    if (!editingUser && userForm.password.length < 8) {
+      toast({ title: 'Weak password', description: 'Password must be at least 8 characters.', variant: 'destructive' });
+      return;
+    }
+    if (userForm.password && userForm.password !== userForm.password_confirmation) {
+      toast({ title: 'Password mismatch', description: 'Passwords do not match.', variant: 'destructive' });
+      return;
+    }
+    const payload = { name, email, is_admin: true };
+    if (!editingUser || userForm.password) {
+      payload.password = userForm.password;
+      payload.password_confirmation = userForm.password_confirmation;
+    }
+    setIsMutatingUser(true);
+    try {
+      if (editingUser?.id) {
+        await updateAdminUser(editingUser.id, payload);
+        toast({ title: 'Admin updated', description: `${name} has been updated.`, variant: 'success' });
+      } else {
+        await createAdminUser(payload);
+        toast({ title: 'Admin added', description: `${name} has been added as admin.`, variant: 'success' });
+      }
+      setIsUserDialogOpen(false);
+      await loadAdminUsers();
+    } catch (error) {
+      toast({ title: 'Failed to save', description: error?.message || 'Unable to save admin user.', variant: 'destructive' });
+    } finally {
+      setIsMutatingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser?.id) return;
+    setIsMutatingUser(true);
+    try {
+      await deleteAdminUser(deletingUser.id);
+      toast({ title: 'Admin removed', description: `${deletingUser.name} has been removed.`, variant: 'success' });
+      setIsDeleteUserDialogOpen(false);
+      setDeletingUser(null);
+      await loadAdminUsers();
+    } catch (error) {
+      toast({ title: 'Delete failed', description: error?.message || 'Unable to remove admin.', variant: 'destructive' });
+    } finally {
+      setIsMutatingUser(false);
+    }
+  };
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -172,24 +268,50 @@ const AdminSettingsPage = () => {
 
           <Card className="border-none bg-white/70 shadow-lg backdrop-blur-md">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-emerald-600" />
-                <CardTitle className="text-lg">Security & Access</CardTitle>
-              </div>
-              <CardDescription>Manage administrator roles and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">M</div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">mutya (Primary Admin)</p>
-                    <p className="text-[10px] text-slate-500">Full Access Control</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                  <CardTitle className="text-lg">Security & Access</CardTitle>
                 </div>
-                <Badge className="bg-blue-600 text-white">Owner</Badge>
+                <Button size="sm" className="gap-1.5 rounded-xl bg-[#2954C8] text-xs" onClick={openAddUserDialog}>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add Admin
+                </Button>
               </div>
-              <Button variant="outline" className="w-full rounded-xl border-slate-200 text-xs font-bold">Manage Permissions</Button>
+              <CardDescription>Manage administrator accounts and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isLoadingAdmins ? (
+                <p className="text-xs text-slate-400 animate-pulse">Loading admins...</p>
+              ) : adminUsers.length === 0 ? (
+                <p className="text-xs text-slate-400">No admin users found.</p>
+              ) : (
+                adminUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
+                        {user.name.substring(0, 2)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{user.name}</p>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <Mail className="h-3 w-3" />
+                          {user.email}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-600 text-white text-[10px]">Admin</Badge>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => openEditUserDialog(user)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => { setDeletingUser(user); setIsDeleteUserDialogOpen(true); }}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 

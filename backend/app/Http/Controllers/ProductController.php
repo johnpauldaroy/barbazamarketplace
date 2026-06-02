@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Store;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -137,6 +138,104 @@ class ProductController extends Controller
             'message' => $existingCategory ? 'Category already exists' : 'Category created successfully',
             'categories' => $this->getCategoryCollection($storeId),
         ], $existingCategory ? 200 : 201);
+    }
+
+    public function updateCategory(Request $request, string $name)
+    {
+        $validated = $request->validate([
+            'name' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100',
+            'store_id' => 'nullable|integer|exists:stores,id',
+        ]);
+
+        $oldName = trim(urldecode($name));
+        $newName = trim((string) ($validated['name'] ?? $validated['category'] ?? ''));
+
+        if ($oldName === '' || $newName === '') {
+            return response()->json([
+                'message' => 'Category name is required.',
+            ], 422);
+        }
+
+        $storeId = isset($validated['store_id'])
+            ? (int) $validated['store_id']
+            : Store::ensurePlatformStore()->id;
+
+        if (Str::lower($oldName) === Str::lower($newName)) {
+            return response()->json([
+                'message' => 'Category updated successfully',
+                'categories' => $this->getCategoryCollection($storeId),
+            ]);
+        }
+
+        $oldCategory = $this->findCategoryByName($oldName, $storeId);
+        $targetCategory = $this->findCategoryByName($newName, $storeId);
+        $productCount = $this->productCategoryQuery($oldName, $storeId)->count();
+
+        if (!$oldCategory && $productCount === 0) {
+            return response()->json([
+                'message' => 'Category not found.',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($oldCategory, $targetCategory, $oldName, $newName, $storeId) {
+            if ($targetCategory && $oldCategory && $targetCategory->id !== $oldCategory->id) {
+                $oldCategory->delete();
+            } elseif ($oldCategory) {
+                $oldCategory->update(['name' => $newName]);
+            } elseif (!$targetCategory) {
+                Category::create([
+                    'store_id' => $storeId,
+                    'name' => $newName,
+                ]);
+            }
+
+            $this->productCategoryQuery($oldName, $storeId)->update(['category' => $newName]);
+        });
+
+        return response()->json([
+            'message' => 'Category updated successfully',
+            'categories' => $this->getCategoryCollection($storeId),
+        ]);
+    }
+
+    public function destroyCategory(Request $request, string $name)
+    {
+        $validated = $request->validate([
+            'store_id' => 'nullable|integer|exists:stores,id',
+        ]);
+
+        $categoryName = trim(urldecode($name));
+        if ($categoryName === '') {
+            return response()->json([
+                'message' => 'Category name is required.',
+            ], 422);
+        }
+
+        $storeId = isset($validated['store_id'])
+            ? (int) $validated['store_id']
+            : Store::ensurePlatformStore()->id;
+
+        $productCount = $this->productCategoryQuery($categoryName, $storeId)->count();
+        if ($productCount > 0) {
+            return response()->json([
+                'message' => 'Category is used by products. Update those products before deleting it.',
+            ], 409);
+        }
+
+        $category = $this->findCategoryByName($categoryName, $storeId);
+        if (!$category) {
+            return response()->json([
+                'message' => 'Category not found.',
+            ], 404);
+        }
+
+        $category->delete();
+
+        return response()->json([
+            'message' => 'Category deleted successfully',
+            'categories' => $this->getCategoryCollection($storeId),
+        ]);
     }
 
     public function store(Request $request)
@@ -323,6 +422,21 @@ class ProductController extends Controller
                 'name' => $name,
             ]);
         }
+    }
+
+    protected function findCategoryByName(string $name, int $storeId): ?Category
+    {
+        return Category::query()
+            ->where('store_id', $storeId)
+            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
+            ->first();
+    }
+
+    protected function productCategoryQuery(string $name, int $storeId): Builder
+    {
+        return Product::query()
+            ->where('store_id', $storeId)
+            ->whereRaw('LOWER(category) = ?', [Str::lower($name)]);
     }
 
     protected function applyVisibleReviewSummary(Builder $query): Builder

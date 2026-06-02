@@ -77,6 +77,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/admin/stores/{storeId}/merchants', [AdminStoreController::class, 'storeMerchant']);
         Route::put('/admin/merchants/{userId}', [AdminStoreController::class, 'updateMerchant']);
         Route::post('/categories', [ProductController::class, 'storeCategory']);
+        Route::put('/categories/{name}', [ProductController::class, 'updateCategory']);
+        Route::delete('/categories/{name}', [ProductController::class, 'destroyCategory']);
         Route::post('/products', [ProductController::class, 'store']);
         Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
         Route::put('/products/{id}', [ProductController::class, 'update']);

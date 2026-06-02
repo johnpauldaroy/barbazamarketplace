@@ -170,6 +170,79 @@ class MultiTenantMerchantTest extends TestCase
         $this->assertDatabaseHas('categories', ['store_id' => $storeB->id, 'name' => 'Beverages']);
     }
 
+    public function test_admin_can_rename_platform_category_and_products(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::ensurePlatformStore();
+
+        Category::create([
+            'store_id' => $store->id,
+            'name' => 'Fruits',
+        ]);
+        Product::create([
+            'store_id' => $store->id,
+            'title' => 'Mango',
+            'price' => 50,
+            'category' => 'Fruits',
+            'stock' => 10,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->putJson('/api/categories/Fruits', [
+            'name' => 'Fresh Fruits',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Category updated successfully');
+        $this->assertDatabaseHas('categories', ['store_id' => $store->id, 'name' => 'Fresh Fruits']);
+        $this->assertDatabaseMissing('categories', ['store_id' => $store->id, 'name' => 'Fruits']);
+        $this->assertDatabaseHas('products', ['store_id' => $store->id, 'title' => 'Mango', 'category' => 'Fresh Fruits']);
+    }
+
+    public function test_admin_can_delete_unused_platform_category(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::ensurePlatformStore();
+
+        Category::create([
+            'store_id' => $store->id,
+            'name' => 'Seasonal',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson('/api/categories/Seasonal')->assertOk();
+        $this->assertDatabaseMissing('categories', ['store_id' => $store->id, 'name' => 'Seasonal']);
+    }
+
+    public function test_admin_cannot_delete_category_used_by_products(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::ensurePlatformStore();
+
+        Category::create([
+            'store_id' => $store->id,
+            'name' => 'Produce',
+        ]);
+        Product::create([
+            'store_id' => $store->id,
+            'title' => 'Tomato',
+            'price' => 25,
+            'category' => 'Produce',
+            'stock' => 8,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson('/api/categories/Produce')
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Category is used by products. Update those products before deleting it.');
+
+        $this->assertDatabaseHas('categories', ['store_id' => $store->id, 'name' => 'Produce']);
+        $this->assertDatabaseHas('products', ['store_id' => $store->id, 'title' => 'Tomato', 'category' => 'Produce']);
+    }
+
     public function test_merchant_orders_are_scoped_and_include_store_specific_totals(): void
     {
         $storeA = Store::create([
