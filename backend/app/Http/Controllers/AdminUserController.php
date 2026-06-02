@@ -22,7 +22,6 @@ class AdminUserController extends Controller
 
         $users = User::query()
             ->with('store')
-            ->where('is_merchant', false)
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nestedQuery) use ($search) {
                     $nestedQuery

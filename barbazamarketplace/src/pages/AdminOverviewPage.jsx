@@ -378,7 +378,7 @@ const AdminOverviewPage = () => {
               {[
                 { to: '/admin/orders',   icon: ShoppingCart, label: 'Manage Orders',   sub: `${summary.pending_orders || 0} pending`, color: 'bg-amber-50 text-amber-600' },
                 { to: '/admin/products', icon: Package,      label: 'Add Product',     sub: `${summary.total_products || 0} total`, color: 'bg-blue-50 text-blue-600' },
-                { to: '/admin/customers',icon: Users,        label: 'View Customers',  sub: `${summary.unique_customers || 0} customers`, color: 'bg-emerald-50 text-emerald-600' },
+                { to: '/admin/customers',icon: Users,        label: 'View Users',      sub: `${summary.unique_customers || 0} customers`, color: 'bg-emerald-50 text-emerald-600' },
                 { to: '/admin/stores',   icon: ShoppingCart, label: 'Manage Stores',   sub: `${summary.active_categories || 0} categories`, color: 'bg-violet-50 text-violet-600' },
                 { to: '/admin/reports',  icon: TrendingUp,   label: 'View Reports',    sub: 'Analytics & insights', color: 'bg-rose-50 text-rose-600' },
               ].map(({ to, icon: Icon, label, sub, color }) => (

@@ -26,6 +26,12 @@ const formatJoinDate = (value) => {
   return date.toLocaleDateString();
 };
 
+const getUserRoleLabel = (user) => {
+  if (user?.is_admin) return 'Admin';
+  if (user?.is_merchant) return 'Merchant';
+  return 'Member';
+};
+
 const AdminCustomersPage = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState([]);
@@ -57,7 +63,7 @@ const AdminCustomersPage = () => {
     } catch (error) {
       toast({
         title: 'Unable to load users',
-        description: error?.message || 'Failed to fetch customer directory.',
+        description: error?.message || 'Failed to fetch user directory.',
         variant: 'destructive',
       });
     } finally {
@@ -71,20 +77,23 @@ const AdminCustomersPage = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredCustomers = useMemo(() => {
-    const members = users.filter((user) => !user.is_admin);
+  const filteredUsers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return members;
-    return members.filter((user) =>
-      [user?.name, user?.email].filter(Boolean).join(' ').toLowerCase().includes(query)
+    if (!query) return users;
+    return users.filter((user) =>
+      [user?.name, user?.email, getUserRoleLabel(user), user?.store?.name]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
     );
   }, [users, searchQuery]);
 
   useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
-  const lastPage = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
+  const lastPage = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, lastPage);
-  const pagedCustomers = filteredCustomers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openAddDialog = () => {
     setEditingUser(null);
@@ -97,7 +106,7 @@ const AdminCustomersPage = () => {
     setForm({
       name: user?.name || '',
       email: user?.email || '',
-      role: user?.is_admin ? 'admin' : 'member',
+      role: user?.is_admin ? 'admin' : user?.is_merchant ? 'merchant' : 'member',
       password: '',
       password_confirmation: '',
     });
@@ -233,8 +242,8 @@ const AdminCustomersPage = () => {
       <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-xl font-bold text-slate-800">Customer Management</CardTitle>
-            <p className="text-sm text-slate-500">View and manage registered marketplace members</p>
+            <CardTitle className="text-xl font-bold text-slate-800">System Users</CardTitle>
+            <p className="text-sm text-slate-500">View admins, merchants, and registered marketplace members</p>
           </div>
           <Button className="gap-2 text-xs font-bold rounded-xl bg-[#2954C8]" onClick={openAddDialog}>
             <UserPlus className="h-4 w-4" />
@@ -246,7 +255,7 @@ const AdminCustomersPage = () => {
             <div className="relative flex-1 min-w-[300px]">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Search by name or email..."
+                placeholder="Search by name, email, role, or store..."
                 className="h-11 rounded-2xl border-slate-200 pl-11 focus:ring-2 focus:ring-[#2954C8]/20"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -258,7 +267,7 @@ const AdminCustomersPage = () => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
-                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Customer</th>
+                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">User</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Joined</th>
@@ -268,12 +277,12 @@ const AdminCustomersPage = () => {
               <tbody className="divide-y divide-[#ECF1FA]">
                 {loading ? (
                    <tr><td colSpan="5" className="py-10 text-center text-slate-400 animate-pulse">Loading directory...</td></tr>
-                ) : pagedCustomers.length === 0 ? (
+                ) : pagedUsers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-20 text-center text-slate-500">No users found.</td>
                   </tr>
                 ) : (
-                  pagedCustomers.map((user) => (
+                  pagedUsers.map((user) => (
                     <tr key={user.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -295,8 +304,11 @@ const AdminCustomersPage = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                           <Shield className="h-3.5 w-3.5 text-slate-400" />
-                          {user.is_admin ? 'Admin' : 'Member'}
+                          {getUserRoleLabel(user)}
                         </div>
+                        {user?.is_merchant && user?.store?.name ? (
+                          <p className="mt-1 text-[10px] text-slate-400">{user.store.name}</p>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-[10px] font-medium text-slate-500">{formatJoinDate(user.created_at)}</p>
@@ -309,6 +321,8 @@ const AdminCustomersPage = () => {
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                             onClick={() => openEditDialog(user)}
+                            disabled={user.is_merchant}
+                            title={user.is_merchant ? 'Merchant accounts are managed from Stores' : 'Edit user'}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -318,6 +332,8 @@ const AdminCustomersPage = () => {
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                             onClick={() => openDeleteDialog(user)}
+                            disabled={user.is_merchant}
+                            title={user.is_merchant ? 'Merchant accounts are managed from Stores' : 'Delete user'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -372,9 +388,12 @@ const AdminCustomersPage = () => {
                 id="customer-role"
                 value={form.role}
                 onChange={(event) => updateFormField('role', event.target.value)}
+                disabled={form.role === 'merchant'}
                 className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20"
               >
                 <option value="member">Member</option>
+                <option value="admin">Admin</option>
+                {form.role === 'merchant' ? <option value="merchant">Merchant</option> : null}
               </select>
             </div>
 

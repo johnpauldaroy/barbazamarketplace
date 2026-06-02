@@ -58,6 +58,30 @@ class MultiTenantMerchantTest extends TestCase
         $response->assertForbidden();
     }
 
+    public function test_admin_user_directory_includes_merchants(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::create([
+            'name' => 'Merchant Directory Store',
+            'slug' => 'merchant-directory-store',
+            'status' => 'active',
+        ]);
+        $merchant = User::factory()->create([
+            'is_admin' => false,
+            'is_merchant' => true,
+            'store_id' => $store->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/admin/users');
+
+        $response->assertOk();
+        $this->assertTrue(
+            collect($response->json('users'))->contains(fn ($user) => $user['id'] === $merchant->id && $user['is_merchant'] === true)
+        );
+    }
+
     public function test_customer_cannot_access_admin_or_merchant_endpoints(): void
     {
         $customer = User::factory()->create([

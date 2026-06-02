@@ -19,7 +19,7 @@ const LINKS = [
   { id: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, path: '/admin',          exact: true },
   { id: 'orders',    label: 'Orders',      icon: ShoppingCart,    path: '/admin/orders' },
   { id: 'products',  label: 'Products',    icon: Package,         path: '/admin/products' },
-  { id: 'customers', label: 'Customers',   icon: Users,           path: '/admin/customers' },
+  { id: 'customers', label: 'Users',       icon: Users,           path: '/admin/customers' },
   { id: 'stores',    label: 'Stores',      icon: Store,           path: '/admin/stores' },
   { id: 'reports',   label: 'Reports',     icon: ChartColumn,     path: '/admin/reports' },
   { id: 'reviews',   label: 'Reviews',     icon: MessageSquare,   path: '/admin/reviews' },

@@ -219,7 +219,7 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, sectionId: 'overview' },
     { id: 'orders', label: 'Orders', icon: ShoppingCart, sectionId: 'orders' },
     { id: 'products', label: 'Products', icon: Package, sectionId: 'inventory' },
-    { id: 'customers', label: 'Customers', icon: Users, sectionId: 'customers' },
+    { id: 'customers', label: 'Users', icon: Users, sectionId: 'customers' },
     { id: 'reports', label: 'Reports', icon: ChartColumn, sectionId: 'performance' },
     { id: 'settings', label: 'Settings', icon: Settings, sectionId: 'settings' },
   ];
