@@ -365,6 +365,29 @@ export const createCategory = async (payload) => {
     }
 };
 
+export const updateCategory = async (name, payload) => {
+    try {
+        return await apiRequest(`/categories/${encodeURIComponent(name)}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Update category error:', error);
+        throw error;
+    }
+};
+
+export const deleteCategory = async (name) => {
+    try {
+        return await apiRequest(`/categories/${encodeURIComponent(name)}`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        console.error('Delete category error:', error);
+        throw error;
+    }
+};
+
 // Admin store + merchant management
 export const fetchAdminStores = async () => {
     return apiRequest('/admin/stores');

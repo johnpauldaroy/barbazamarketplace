@@ -5,12 +5,13 @@ import {
   ArrowRight,
   CircleDollarSign,
   Leaf,
+  MapPin,
   ShieldCheck,
   ShoppingBag,
   Star,
   Truck,
 } from 'lucide-react';
-import { fetchProducts } from '../api/EcommerceApi';
+import { fetchProducts, fetchStores } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../hooks/useCart';
 import { buildSimpleCartItem } from '../lib/marketplace';
@@ -30,7 +31,7 @@ const TRUST_ITEMS = [
   },
   {
     icon: Truck,
-    title: 'Convenient community delivery',
+    title: 'Shop essentials with ease',
     desc: 'Families can easily browse and order essential goods in one organized marketplace.',
   },
   {
@@ -48,6 +49,7 @@ const TRUST_ITEMS = [
 const HomePage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [locations, setLocations] = useState([]);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -59,6 +61,25 @@ const HomePage = () => {
       })
       .catch(() => {})
       .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchStores({ per_page: 100 })
+      .then((data) => {
+        if (!mounted) return;
+        const stores = Array.isArray(data?.stores) ? data.stores : [];
+        const unique = Array.from(
+          new Set(
+            stores
+              .map((s) => [s?.city, s?.province].filter(Boolean).join(', '))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setLocations(unique.slice(0, 6));
+      })
+      .catch(() => {});
     return () => { mounted = false; };
   }, []);
 
@@ -98,13 +119,13 @@ const HomePage = () => {
                 Barbaza MPC Community Marketplace
               </span>
               <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-                Supporting local members,{' '}
-                <span className="text-[#7ec8ff]">shared growth.</span>
+                When local members thrive,{' '}
+                <span className="text-[#7ec8ff]">our community grows.</span>
               </h1>
               <p className="mt-5 max-w-lg text-base leading-relaxed text-white/65">
-                Explore products from cooperative members and local producers through a marketplace
-                built to strengthen livelihoods, encourage shared progress, and make everyday
-                shopping more meaningful.
+                Behind every product is a local member working to build a better future. Explore
+                products from our cooperative members through our marketplace built to strengthen
+                livelihoods, encourage shared progress, and make everyday shopping more meaningful.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
@@ -178,6 +199,39 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+
+      {/* ── LOCATION STRIP ── */}
+      {locations.length > 0 && (
+        <section className="border-b border-[#dfe7f4] bg-[#f8fafd]">
+          <div className="section py-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[#2954C8]" />
+                <p className="text-sm font-semibold text-[#0b1739]">Shop by Location</p>
+              </div>
+              <Link
+                to="/products"
+                className="flex items-center gap-1 text-xs font-semibold text-[#2954C8] hover:text-[#1f44a5]"
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {locations.map((loc) => (
+                <Link
+                  key={loc}
+                  to={`/products?location=${encodeURIComponent(loc)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#dfe7f4] bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-all hover:border-[#2954C8] hover:bg-[#eef3fb] hover:text-[#2954C8] hover:shadow-sm"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  {loc}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── FEATURED PRODUCTS ── */}
       <section className="section py-14">

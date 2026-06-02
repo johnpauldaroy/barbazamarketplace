@@ -4,13 +4,14 @@ import {
   ChevronRight,
   Filter,
   Loader2,
+  MapPin,
   Search,
   SlidersHorizontal,
   Tag,
   X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { fetchProducts } from '../api/EcommerceApi';
+import { Link, useSearchParams } from 'react-router-dom';
+import { fetchProducts, fetchStores } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../hooks/useCart';
 import { buildSimpleCartItem } from '../lib/marketplace';
@@ -26,13 +27,20 @@ const SORT_OPTIONS = [
   { value: 'stock', label: 'Stock availability' },
 ];
 
+const resolveStoreLocation = (store) =>
+  [store?.city, store?.province].filter(Boolean).join(', ');
+
 const ProductsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || '');
+  const [selectedLocation, setSelectedLocation] = useState(() => searchParams.get('location') || '');
   const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -44,12 +52,40 @@ const ProductsPage = () => {
   const pagingRef = useRef(false);
   const { addToCart } = useCart();
 
+  // Sync URL params → state when URL changes externally (e.g. from homepage links)
+  useEffect(() => {
+    setSelectedCategory(searchParams.get('category') || '');
+    setSelectedLocation(searchParams.get('location') || '');
+  }, [searchParams]);
+
+  // Keep URL in sync with filter state
+  useEffect(() => {
+    const params = {};
+    if (selectedCategory) params.category = selectedCategory;
+    if (selectedLocation) params.location = selectedLocation;
+    setSearchParams(params, { replace: true });
+  }, [selectedCategory, selectedLocation, setSearchParams]);
+
+  // Load available locations from stores once
+  useEffect(() => {
+    fetchStores({ per_page: 100 })
+      .then((data) => {
+        const stores = Array.isArray(data?.stores) ? data.stores : [];
+        const unique = Array.from(
+          new Set(stores.map(resolveStoreLocation).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+        setLocations(unique);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
   useEffect(() => {
+    setAllProducts([]);
     setProducts([]);
     setPage(1);
     setHasMore(false);
@@ -78,7 +114,7 @@ const ProductsPage = () => {
         setCategories(cats);
         setHasMore(Boolean(meta.has_more_pages));
         setTotal(Number(meta.total || incoming.length));
-        setProducts((prev) => {
+        setAllProducts((prev) => {
           if (isFirst) return incoming;
           const ids = new Set(prev.map((p) => p.id));
           return [...prev, ...incoming.filter((p) => !ids.has(p.id))];
@@ -95,6 +131,17 @@ const ProductsPage = () => {
 
     return () => { cancelled = true; };
   }, [page, debouncedSearch, selectedCategory, sortBy]);
+
+  // Client-side location filter applied on top of API results
+  useEffect(() => {
+    if (!selectedLocation) {
+      setProducts(allProducts);
+      return;
+    }
+    setProducts(
+      allProducts.filter((p) => resolveStoreLocation(p.store) === selectedLocation)
+    );
+  }, [allProducts, selectedLocation]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -117,11 +164,12 @@ const ProductsPage = () => {
     startTransition(() => {
       setSearchQuery('');
       setSelectedCategory('');
+      setSelectedLocation('');
       setSortBy('newest');
     });
   };
 
-  const hasActiveFilters = debouncedSearch || selectedCategory || sortBy !== 'newest';
+  const hasActiveFilters = debouncedSearch || selectedCategory || selectedLocation || sortBy !== 'newest';
 
   const SidebarContent = () => (
     <div className="space-y-6">
@@ -158,6 +206,42 @@ const ProductsPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Location */}
+      {locations.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Location
+          </h3>
+          <div className="space-y-0.5">
+            <button
+              type="button"
+              onClick={() => { startTransition(() => setSelectedLocation('')); setSidebarOpen(false); }}
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                !selectedLocation ? 'bg-[#eef3fb] text-[#2954C8]' : 'text-slate-600 hover:bg-[#f4f7fd]'
+              )}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              All locations
+            </button>
+            {locations.map((loc) => (
+              <button
+                key={loc}
+                type="button"
+                onClick={() => { startTransition(() => setSelectedLocation(loc)); setSidebarOpen(false); }}
+                className={cn(
+                  'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left',
+                  selectedLocation === loc ? 'bg-[#eef3fb] text-[#2954C8]' : 'text-slate-600 hover:bg-[#f4f7fd]'
+                )}
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{loc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Sort */}
       <div>
@@ -256,8 +340,10 @@ const ProductsPage = () => {
             >
               <Filter className="h-4 w-4" />
               Filters
-              {selectedCategory && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2954C8] text-[10px] font-bold text-white">1</span>
+              {(selectedCategory || selectedLocation) && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#2954C8] text-[10px] font-bold text-white">
+                  {[selectedCategory, selectedLocation].filter(Boolean).length}
+                </span>
               )}
             </button>
 
@@ -285,8 +371,16 @@ const ProductsPage = () => {
             )}
             {selectedCategory && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dfe7f4] bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                <Tag className="h-3 w-3" />
                 {selectedCategory}
                 <button type="button" onClick={() => setSelectedCategory('')}><X className="h-3 w-3" /></button>
+              </span>
+            )}
+            {selectedLocation && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dfe7f4] bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                <MapPin className="h-3 w-3" />
+                {selectedLocation}
+                <button type="button" onClick={() => setSelectedLocation('')}><X className="h-3 w-3" /></button>
               </span>
             )}
           </div>

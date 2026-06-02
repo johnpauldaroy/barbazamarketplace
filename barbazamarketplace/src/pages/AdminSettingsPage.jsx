@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Save, Shield, Store, Globe, Tags } from 'lucide-react';
+import { Save, Shield, Store, Globe, Tags, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useToast } from '../components/ui/use-toast';
-import { createCategory, getCategories } from '../api/EcommerceApi';
+import { createCategory, getCategories, updateCategory, deleteCategory } from '../api/EcommerceApi';
 
 const AdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -15,6 +15,9 @@ const AdminSettingsPage = () => {
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [deletingCategory, setDeletingCategory] = useState(null);
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -78,6 +81,54 @@ const AdminSettingsPage = () => {
       });
     } finally {
       setIsSavingCategory(false);
+    }
+  };
+
+  const handleStartEdit = (category) => {
+    setEditingCategory(category);
+    setEditValue(category);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null);
+    setEditValue('');
+  };
+
+  const handleSaveEdit = async (oldName) => {
+    const newName = editValue.trim();
+    if (!newName) return;
+    if (newName === oldName) {
+      handleCancelEdit();
+      return;
+    }
+
+    try {
+      const response = await updateCategory(oldName, { name: newName });
+      const updatedCategories = Array.isArray(response?.categories)
+        ? response.categories
+        : categories.map((c) => (c === oldName ? newName : c));
+      setCategories(updatedCategories);
+      setEditingCategory(null);
+      setEditValue('');
+      toast({ title: 'Category updated', description: `Renamed to "${newName}".`, variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Unable to update category', description: error?.message || 'Failed to update category.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCategory = async (name) => {
+    setDeletingCategory(name);
+    try {
+      const response = await deleteCategory(name);
+      const updatedCategories = Array.isArray(response?.categories)
+        ? response.categories
+        : categories.filter((c) => c !== name);
+      setCategories(updatedCategories);
+      toast({ title: 'Category deleted', description: `"${name}" has been removed.`, variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Unable to delete category', description: error?.message || 'Failed to delete category.', variant: 'destructive' });
+    } finally {
+      setDeletingCategory(null);
     }
   };
 
@@ -173,9 +224,42 @@ const AdminSettingsPage = () => {
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {sortedCategories.map((category) => (
-                      <Badge key={category} variant="outline" className="border-slate-300 text-slate-600">
-                        {category}
-                      </Badge>
+                      editingCategory === category ? (
+                        <span key={category} className="flex items-center gap-1">
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(category); if (e.key === 'Escape') handleCancelEdit(); }}
+                            className="h-7 w-36 rounded-lg border-slate-300 px-2 text-xs"
+                            autoFocus
+                          />
+                          <button onClick={() => handleSaveEdit(category)} className="text-emerald-600 hover:text-emerald-700">
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={handleCancelEdit} className="text-slate-400 hover:text-slate-600">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ) : (
+                        <Badge key={category} variant="outline" className="group flex items-center gap-1 border-slate-300 pr-1 text-slate-600">
+                          {category}
+                          <button
+                            onClick={() => handleStartEdit(category)}
+                            className="ml-0.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-blue-600"
+                            title="Edit"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(category)}
+                            disabled={deletingCategory === category}
+                            className="text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 disabled:opacity-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )
                     ))}
                   </div>
                 )}
