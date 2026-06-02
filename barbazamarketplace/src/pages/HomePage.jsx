@@ -91,8 +91,45 @@ const HomePage = () => {
   return (
     <>
       <Helmet>
-        <title>e-KoopMart — Community Cooperative Marketplace</title>
-        <meta name="description" content="Shop quality products while supporting Barbaza MPC cooperative members and strengthening our community." />
+        <title>e-KoopMart — Barbaza MPC Community Marketplace</title>
+        <meta name="description" content="Shop quality products from Barbaza Multi-Purpose Cooperative members. When local members thrive, our community grows." />
+        <link rel="canonical" href="https://ekoopmart.barbazampc.coop/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="e-KoopMart — Barbaza MPC Community Marketplace" />
+        <meta property="og:description" content="Shop quality products from Barbaza Multi-Purpose Cooperative members. When local members thrive, our community grows." />
+        <meta property="og:url" content="https://ekoopmart.barbazampc.coop/" />
+        <meta property="og:image" content="https://ekoopmart.barbazampc.coop/logo512.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="e-KoopMart — Barbaza MPC Community Marketplace" />
+        <meta name="twitter:description" content="Shop quality products from Barbaza Multi-Purpose Cooperative members." />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Barbaza Multi-Purpose Cooperative",
+          "alternateName": "e-KoopMart",
+          "url": "https://ekoopmart.barbazampc.coop",
+          "logo": "https://ekoopmart.barbazampc.coop/logo512.png",
+          "description": "Barbaza MPC's online marketplace connecting members, families, and local producers through trusted community commerce.",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Cubay",
+            "addressLocality": "Barbaza",
+            "addressRegion": "Antique",
+            "postalCode": "5706",
+            "addressCountry": "PH"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+63-919-065-4532",
+            "contactType": "customer service",
+            "email": "marketing@barbazampc.coop",
+            "availableLanguage": ["English", "Filipino"]
+          },
+          "sameAs": [
+            "https://facebook.com",
+            "https://instagram.com"
+          ]
+        })}</script>
       </Helmet>
 
       {/* ── HERO ── */}

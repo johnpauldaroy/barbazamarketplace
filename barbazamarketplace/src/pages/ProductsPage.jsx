@@ -274,7 +274,17 @@ const ProductsPage = () => {
     <>
       <Helmet>
         <title>Marketplace — e-KoopMart</title>
-        <meta name="description" content="Browse quality products from Barbaza MPC cooperative members." />
+        <meta name="description" content="Browse quality products from Barbaza MPC cooperative members and local community producers in Barbaza, Antique." />
+        <link rel="canonical" href="https://ekoopmart.barbazampc.coop/products" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Marketplace — e-KoopMart" />
+        <meta property="og:description" content="Browse quality products from Barbaza MPC cooperative members and local community producers." />
+        <meta property="og:url" content="https://ekoopmart.barbazampc.coop/products" />
+        <meta property="og:image" content="https://ekoopmart.barbazampc.coop/logo512.png" />
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Marketplace — e-KoopMart" />
+        <meta name="twitter:description" content="Browse quality products from Barbaza MPC cooperative members." />
       </Helmet>
 
       {/* Page header */}

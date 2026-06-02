@@ -14,7 +14,13 @@ const PrivacyPolicyPage = () => (
   <>
     <Helmet>
       <title>Privacy Policy — e-KoopMart</title>
-      <meta name="description" content="Learn how Barbaza MPC collects, uses, and protects your personal information on e-KoopMart." />
+      <meta name="description" content="Learn how Barbaza Multi-Purpose Cooperative collects, uses, and protects your personal information on e-KoopMart, in compliance with the Data Privacy Act of 2012." />
+      <link rel="canonical" href="https://ekoopmart.barbazampc.coop/privacy-policy" />
+      <meta name="robots" content="noindex, follow" />
+      <meta property="og:type" content="website" />
+      <meta property="og:title" content="Privacy Policy — e-KoopMart" />
+      <meta property="og:url" content="https://ekoopmart.barbazampc.coop/privacy-policy" />
+      <meta property="og:site_name" content="e-KoopMart" />
     </Helmet>
 
     {/* Page header */}

@@ -245,6 +245,40 @@ const ProductDetailPage = () => {
     <>
       <Helmet>
         <title>{product.title || product.name} — e-KoopMart</title>
+        <meta name="description" content={product.description ? `${String(product.description).substring(0, 155)}...` : `Buy ${product.title || product.name} from ${product.store?.name || 'a Barbaza MPC cooperative member store'} on e-KoopMart.`} />
+        <link rel="canonical" href={`https://ekoopmart.barbazampc.coop/product/${product.id}`} />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={`${product.title || product.name} — e-KoopMart`} />
+        <meta property="og:description" content={`Buy ${product.title || product.name} from ${product.store?.name || 'a Barbaza MPC member store'}.`} />
+        <meta property="og:url" content={`https://ekoopmart.barbazampc.coop/product/${product.id}`} />
+        {imageUrl && <meta property="og:image" content={imageUrl} />}
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${product.title || product.name} — e-KoopMart`} />
+        {imageUrl && <meta name="twitter:image" content={imageUrl} />}
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": product.title || product.name,
+          "description": product.description || undefined,
+          "image": imageUrl || undefined,
+          "sku": String(product.id),
+          "brand": { "@type": "Brand", "name": product.store?.name || "Barbaza MPC" },
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "PHP",
+            "price": product.price,
+            "availability": Number(product.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            "seller": { "@type": "Organization", "name": product.store?.name || "Barbaza MPC" }
+          },
+          ...(product.review_summary?.ratings_count > 0 && {
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": product.review_summary.average_rating,
+              "reviewCount": product.review_summary.ratings_count
+            }
+          })
+        })}</script>
       </Helmet>
 
       {/* Breadcrumb */}

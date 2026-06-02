@@ -247,11 +247,37 @@ const StoreDetailPage = () => {
   return (
     <div className="pb-16">
       <Helmet>
-        <title>{store.name} - Store | Barbaza MPC Marketplace</title>
-        <meta
-          name="description"
-          content={`Browse products and contact details for ${store.name}.`}
-        />
+        <title>{store.name} — e-KoopMart Cooperative Store</title>
+        <meta name="description" content={`Browse products from ${store.name}, a Barbaza MPC cooperative member store${store.city ? ` in ${store.city}` : ''}. Shop local and support the community.`} />
+        <link rel="canonical" href={`https://ekoopmart.barbazampc.coop/stores/${store.slug}`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={`${store.name} — e-KoopMart`} />
+        <meta property="og:description" content={`Browse products from ${store.name}, a Barbaza MPC cooperative member store.`} />
+        <meta property="og:url" content={`https://ekoopmart.barbazampc.coop/stores/${store.slug}`} />
+        {store.cover_image && <meta property="og:image" content={store.cover_image} />}
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${store.name} — e-KoopMart`} />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          "name": store.name,
+          "description": store.description || `A Barbaza MPC cooperative member store on e-KoopMart.`,
+          "url": `https://ekoopmart.barbazampc.coop/stores/${store.slug}`,
+          "image": store.cover_image || undefined,
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": [store.address_line_1, store.address_line_2].filter(Boolean).join(', ') || undefined,
+            "addressLocality": store.city || "Barbaza",
+            "addressRegion": store.province || "Antique",
+            "postalCode": store.postal_code || "5706",
+            "addressCountry": "PH"
+          },
+          "parentOrganization": {
+            "@type": "Organization",
+            "name": "Barbaza Multi-Purpose Cooperative"
+          }
+        })}</script>
       </Helmet>
 
       <section className="relative overflow-hidden border-b border-white/70">

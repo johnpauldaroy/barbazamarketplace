@@ -102,11 +102,17 @@ const AboutPage = () => {
   return (
     <div className="pb-16">
       <Helmet>
-        <title>About Us - Barbaza MPC Marketplace</title>
-        <meta
-          name="description"
-          content="Learn about Barbaza Multi-Purpose Cooperative and our mission to serve the community."
-        />
+        <title>About Us — Barbaza MPC & e-KoopMart</title>
+        <meta name="description" content="Learn about Barbaza Multi-Purpose Cooperative — our history, mission, and how e-KoopMart connects members, families, and local producers in Barbaza, Antique." />
+        <link rel="canonical" href="https://ekoopmart.barbazampc.coop/about" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="About Barbaza MPC — e-KoopMart" />
+        <meta property="og:description" content="Learn about Barbaza Multi-Purpose Cooperative and how e-KoopMart connects members, families, and local producers." />
+        <meta property="og:url" content="https://ekoopmart.barbazampc.coop/about" />
+        <meta property="og:image" content="https://ekoopmart.barbazampc.coop/logo512.png" />
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="About Barbaza MPC — e-KoopMart" />
       </Helmet>
 
       <section className="relative overflow-hidden border-b border-white/60">

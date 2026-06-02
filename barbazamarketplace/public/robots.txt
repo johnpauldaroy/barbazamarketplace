@@ -1,3 +1,10 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin/
+Disallow: /merchant/
+Disallow: /checkout
+Disallow: /account
+Disallow: /cart
+
+Sitemap: https://ekoopmart.barbazampc.coop/sitemap.xml

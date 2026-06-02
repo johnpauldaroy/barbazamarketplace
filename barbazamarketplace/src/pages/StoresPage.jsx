@@ -87,11 +87,17 @@ const StoresPage = () => {
   return (
     <div className="pb-16">
       <Helmet>
-        <title>Stores - Barbaza MPC Marketplace</title>
-        <meta
-          name="description"
-          content="Browse active merchant stores and discover products by store."
-        />
+        <title>Member Stores — e-KoopMart</title>
+        <meta name="description" content="Browse cooperative member stores on e-KoopMart. Discover local products from Barbaza MPC members in Barbaza, Antique." />
+        <link rel="canonical" href="https://ekoopmart.barbazampc.coop/stores" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Member Stores — e-KoopMart" />
+        <meta property="og:description" content="Browse cooperative member stores and discover local products from Barbaza MPC members." />
+        <meta property="og:url" content="https://ekoopmart.barbazampc.coop/stores" />
+        <meta property="og:image" content="https://ekoopmart.barbazampc.coop/logo512.png" />
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Member Stores — e-KoopMart" />
       </Helmet>
 
       <section className="border-b border-[#dfe7f4] bg-white">

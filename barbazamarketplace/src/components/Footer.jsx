@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock3, Facebook, Instagram, Mail, MapPin, Phone, ShieldCheck, Truck } from 'lucide-react';
+import { Clock3, Mail, MapPin, Phone } from 'lucide-react';
 
 const EXPLORE_LINKS = [
   { to: '/', label: 'Home' },
@@ -21,54 +21,11 @@ const LEGAL_LINKS = [
   { to: '/privacy-policy', label: 'Privacy Policy' },
 ];
 
-const TRUST_BADGES = [
-  { icon: ShieldCheck, label: 'Verified cooperative products' },
-  { icon: Truck, label: 'Community delivery network' },
-];
-
 const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
     <footer className="mt-auto bg-[#0b1739] text-white">
-      {/* Trust strip */}
-      <div className="border-b border-white/10">
-        <div className="section py-5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
-              {TRUST_BADGES.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2.5 text-sm text-white/70">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[#7ec8ff]">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <span className="leading-tight">{label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
-              >
-                <Facebook className="h-4 w-4" />
-              </a>
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
-              >
-                <Instagram className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main footer grid */}
       <div className="section py-12">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.4fr]">

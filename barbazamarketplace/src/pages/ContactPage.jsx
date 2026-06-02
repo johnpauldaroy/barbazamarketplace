@@ -80,11 +80,17 @@ const ContactPage = () => {
   return (
     <div className="pb-16">
       <Helmet>
-        <title>Contact Us - Barbaza MPC Marketplace</title>
-        <meta
-          name="description"
-          content="Get in touch with Barbaza Multi-Purpose Cooperative. We're here to help."
-        />
+        <title>Contact Us — Barbaza MPC & e-KoopMart</title>
+        <meta name="description" content="Get in touch with Barbaza Multi-Purpose Cooperative. Visit us in Cubay, Barbaza, Antique or reach us at marketing@barbazampc.coop." />
+        <link rel="canonical" href="https://ekoopmart.barbazampc.coop/contact" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Contact Us — Barbaza MPC" />
+        <meta property="og:description" content="Get in touch with Barbaza Multi-Purpose Cooperative. We're here to help with questions about products, membership, or cooperative services." />
+        <meta property="og:url" content="https://ekoopmart.barbazampc.coop/contact" />
+        <meta property="og:image" content="https://ekoopmart.barbazampc.coop/logo512.png" />
+        <meta property="og:site_name" content="e-KoopMart" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Contact Barbaza MPC — e-KoopMart" />
       </Helmet>
 
       <section className="relative overflow-hidden border-b border-white/60">
