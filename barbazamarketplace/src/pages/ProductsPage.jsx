@@ -1,4 +1,4 @@
-import React, { startTransition, useEffect, useRef, useState } from 'react';
+import React, { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import {
   ChevronRight,
@@ -40,7 +40,6 @@ const ProductsPage = () => {
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
   const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -85,7 +84,6 @@ const ProductsPage = () => {
   }, [searchQuery]);
 
   useEffect(() => {
-    setAllProducts([]);
     setProducts([]);
     setPage(1);
     setHasMore(false);
@@ -114,7 +112,7 @@ const ProductsPage = () => {
         setCategories(cats);
         setHasMore(Boolean(meta.has_more_pages));
         setTotal(Number(meta.total || incoming.length));
-        setAllProducts((prev) => {
+        setProducts((prev) => {
           if (isFirst) return incoming;
           const ids = new Set(prev.map((p) => p.id));
           return [...prev, ...incoming.filter((p) => !ids.has(p.id))];
@@ -132,17 +130,6 @@ const ProductsPage = () => {
     return () => { cancelled = true; };
   }, [page, debouncedSearch, selectedCategory, sortBy]);
 
-  // Client-side location filter applied on top of API results
-  useEffect(() => {
-    if (!selectedLocation) {
-      setProducts(allProducts);
-      return;
-    }
-    setProducts(
-      allProducts.filter((p) => resolveStoreLocation(p.store) === selectedLocation)
-    );
-  }, [allProducts, selectedLocation]);
-
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || loading || loadingMore || error || !hasMore) return;
@@ -154,6 +141,11 @@ const ProductsPage = () => {
     obs.observe(el);
     return () => obs.disconnect();
   }, [hasMore, loading, loadingMore, error]);
+
+  const displayProducts = useMemo(() => {
+    if (!selectedLocation) return products;
+    return products.filter((p) => resolveStoreLocation(p.store) === selectedLocation);
+  }, [products, selectedLocation]);
 
   const handleQuickAdd = (product) => {
     const { product: p, variant } = buildSimpleCartItem(product);
@@ -353,7 +345,7 @@ const ProductsPage = () => {
                 <Loader2 className="h-4 w-4 animate-spin text-[#2954C8]" />
               ) : (
                 <span>
-                  {products.length > 0 ? `${products.length} of ${total.toLocaleString()} products` : ''}
+                  {displayProducts.length > 0 ? `${displayProducts.length} of ${total.toLocaleString()} products` : ''}
                 </span>
               )}
             </div>
@@ -406,7 +398,7 @@ const ProductsPage = () => {
               <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
                 {error}
               </div>
-            ) : products.length === 0 ? (
+            ) : displayProducts.length === 0 ? (
               <div className="flex flex-col items-center gap-4 rounded-xl border border-[#dfe7f4] bg-white py-16 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eef3fb] text-[#2954C8]">
                   <Search className="h-6 w-6" />
@@ -426,7 +418,7 @@ const ProductsPage = () => {
             ) : (
               <>
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {products.map((product) => (
+                  {displayProducts.map((product) => (
                     <ProductCard key={product.id} product={product} onAddToCart={handleQuickAdd} />
                   ))}
                 </div>
@@ -441,7 +433,7 @@ const ProductsPage = () => {
                     <span className="text-sm text-slate-400">Scroll to load more</span>
                   ) : (
                     <span className="text-sm text-slate-400">
-                      Showing all {total.toLocaleString()} products
+                      Showing all {displayProducts.length.toLocaleString()} products
                     </span>
                   )}
                 </div>
