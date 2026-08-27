@@ -4,16 +4,19 @@ import {
   ChevronDown,
   LayoutDashboard,
   LogOut,
-  Menu,
   Search,
   ShoppingCart,
   Store,
-  User,
   X,
+  User,
 } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { cn } from '../lib/utils';
+
+// Destinations the mobile bottom bar already covers as tabs, so the menu
+// sheet does not repeat them.
+const BOTTOM_NAV_ROUTES = ['/', '/products', '/stores'];
 
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
@@ -23,9 +26,8 @@ const NAV_LINKS = [
   { to: '/contact', label: 'Contact' },
 ];
 
-const Header = () => {
+const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
   const brandLogoSrc = '/brand-logo-transparent.png';
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
@@ -86,19 +88,19 @@ const Header = () => {
           {!isStaff && (
             <form
               onSubmit={handleSearch}
-              className="hidden flex-1 max-w-xl lg:flex items-center gap-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd] transition-colors focus-within:border-[#2954C8] focus-within:bg-white"
+              className="flex flex-1 max-w-xl items-center gap-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd] transition-colors focus-within:border-[#2954C8] focus-within:bg-white"
             >
               <Search className="ml-3 h-4 w-4 shrink-0 text-slate-400" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products, categories..."
+                placeholder="Search products..."
                 className="h-10 flex-1 bg-transparent px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
               <button
                 type="submit"
-                className="m-1 rounded-md bg-[#2954C8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1f44a5]"
+                className="m-1 hidden rounded-md bg-[#2954C8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1f44a5] sm:block"
               >
                 Search
               </button>
@@ -208,7 +210,7 @@ const Header = () => {
                 type="button"
                 onClick={() => setIsCartOpen(true)}
                 aria-label="Open cart"
-                className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-[#2954C8] text-white transition hover:bg-[#1f44a5]"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2954C8] text-white transition hover:bg-[#1f44a5]"
               >
                 <ShoppingCart className="h-4 w-4" />
                 {cartCount > 0 && (
@@ -219,36 +221,10 @@ const Header = () => {
               </button>
             )}
 
-            {/* Mobile hamburger — 40px minimum touch target */}
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#dfe7f4] bg-white text-slate-600 xl:hidden"
-              onClick={() => setMobileOpen((o) => !o)}
-              aria-label="Toggle menu"
-            >
-              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
+
           </div>
         </div>
 
-        {/* Mobile search bar */}
-        {!isStaff && (
-          <div className="border-t border-[#f0f4fc] px-4 pb-3 pt-2 lg:hidden">
-            <form
-              onSubmit={handleSearch}
-              className="flex items-center gap-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd] focus-within:border-[#2954C8] focus-within:bg-white transition-colors"
-            >
-              <Search className="ml-3 h-4 w-4 shrink-0 text-slate-400" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
-                className="h-10 flex-1 bg-transparent px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              />
-            </form>
-          </div>
-        )}
       </div>
 
       {/* Mobile drawer */}
@@ -258,8 +234,11 @@ const Header = () => {
             className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm xl:hidden"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="fixed bottom-0 left-0 top-0 z-50 w-72 overflow-y-auto bg-[#0b1739] shadow-2xl xl:hidden">
-            <div className="bg-white">
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-[#0b1739] shadow-2xl xl:hidden"
+            style={{ paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' }}
+          >
+            <div className="rounded-t-2xl bg-white">
             <div className="flex h-14 items-center justify-between border-b border-[#dfe7f4] px-4">
               <Link to="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
                 <img src={brandLogoSrc} alt="e-KoopMart" className="h-8 w-8 object-contain" />
@@ -271,7 +250,7 @@ const Header = () => {
             </div>
 
             <div className="p-4 space-y-1">
-              {!isStaff && NAV_LINKS.map((link) => (
+              {!isStaff && NAV_LINKS.filter((link) => !BOTTOM_NAV_ROUTES.includes(link.to)).map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -309,55 +288,11 @@ const Header = () => {
               )}
             </div>
 
-            {/* Quick links section */}
-            <div className="px-4 pb-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">Quick links</p>
-              <div className="space-y-0.5">
-                {[{ to: '/about', label: 'About Barbaza MPC' }, { to: '/contact', label: 'Contact us' }].map(link => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#f4f7fd]"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-
             </div>{/* end bg-white */}
             {/* Auth section — dark branded footer */}
             <div className="p-4 space-y-2">
               {isAuthenticated ? (
                 <>
-                  {!isStaff && (
-                    <Link
-                      to="/account"
-                      onClick={() => setMobileOpen(false)}
-                      className="flex w-full items-center gap-2 rounded-lg border border-white/15 px-4 py-2.5 text-sm font-medium text-white/80 hover:bg-white/10"
-                    >
-                      <User className="h-4 w-4" />
-                      My Account
-                    </Link>
-                  )}
-                  {!isStaff && (
-                    <button
-                      type="button"
-                      onClick={() => { setIsCartOpen(true); setMobileOpen(false); }}
-                      className="flex w-full items-center justify-between rounded-lg border border-white/15 px-4 py-2.5 text-sm font-medium text-white/80 hover:bg-white/10"
-                    >
-                      <span className="flex items-center gap-2">
-                        <ShoppingCart className="h-4 w-4" />
-                        Cart
-                      </span>
-                      {cartCount > 0 && (
-                        <span className="rounded-full bg-[#2954C8] px-2 py-0.5 text-xs font-bold text-white">
-                          {cartCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => { logout(); setMobileOpen(false); }}
@@ -370,13 +305,6 @@ const Header = () => {
               ) : (
                 <>
                   <Link
-                    to="/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="block w-full rounded-lg border border-white/20 px-4 py-2.5 text-center text-sm font-medium text-white/80 hover:bg-white/10"
-                  >
-                    Log in
-                  </Link>
-                  <Link
                     to="/register"
                     onClick={() => setMobileOpen(false)}
                     className="block w-full rounded-lg bg-[#2954C8] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1f44a5]"
@@ -385,7 +313,7 @@ const Header = () => {
                   </Link>
                 </>
               )}
-              <p className="pt-2 text-center text-[11px] text-white/30">
+              <p className="pt-1 text-center text-[10px] leading-relaxed text-white/40">
                 e-KoopMart · Barbaza MPC
               </p>
             </div>

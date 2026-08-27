@@ -1,8 +1,10 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Navigate, useLocation, useRoutes } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { cn } from './lib/utils';
+import MobileBottomNav from './components/MobileBottomNav';
 import ShoppingCart from './components/ShoppingCart';
 import { Toaster } from './components/ui/toaster';
 import { CartProvider } from './hooks/useCart';
@@ -128,14 +130,23 @@ const AppLayout = () => {
   const location = useLocation();
   const isPortalPage = location.pathname.startsWith('/admin') || location.pathname.startsWith('/merchant');
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-screen flex flex-col bg-transparent">
+    <div
+      className={cn(
+        'min-h-screen flex flex-col bg-transparent',
+        // Reserve room for the fixed mobile bottom bar so footers and
+        // page-ending CTAs are never hidden behind it.
+        !isPortalPage && 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] xl:pb-0'
+      )}
+    >
       <Helmet>
         <title>e-KoopMart</title>
         <meta name="description" content="Shop quality products at e-KoopMart and support members and community producers." />
       </Helmet>
 
-      {!isPortalPage && <Header />}
+      {!isPortalPage && <Header mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} />}
       {!isPortalPage && <ShoppingCart />}
 
       <main className={isPortalPage ? '' : 'flex-1'}>
@@ -145,6 +156,12 @@ const AppLayout = () => {
       </main>
 
       {!isPortalPage && <Footer />}
+      {!isPortalPage && (
+        <MobileBottomNav
+          onOpenMenu={() => setMobileMenuOpen((open) => !open)}
+          menuOpen={mobileMenuOpen}
+        />
+      )}
       <Toaster />
     </div>
   );
