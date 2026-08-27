@@ -206,7 +206,7 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
                   to="/register"
                   className="rounded-lg bg-[#2954C8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1f44a5] transition-colors"
                 >
-                  Register
+                  Sign up
                 </Link>
               </div>
             )}
@@ -316,7 +316,7 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
                     onClick={() => setMobileOpen(false)}
                     className="block w-full rounded-lg bg-[#2954C8] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1f44a5]"
                   >
-                    Create account
+                    Sign up
                   </Link>
                 </>
               )}

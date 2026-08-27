@@ -126,7 +126,7 @@ const LoginPage = () => {
                 to={`/register?redirect=${encodeURIComponent(redirectPath)}`}
                 className="font-semibold text-[#2954C8] hover:underline"
               >
-                Create account
+                Sign up
               </Link>
             </p>
           </div>

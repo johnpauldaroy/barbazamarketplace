@@ -49,7 +49,7 @@ const RegisterPage = () => {
   return (
     <>
       <Helmet>
-        <title>Create account — e-KoopMart</title>
+        <title>Sign up — e-KoopMart</title>
       </Helmet>
 
       <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-12">
@@ -131,7 +131,7 @@ const RegisterPage = () => {
                 disabled={submitting}
                 className="mt-2 w-full rounded-lg bg-[#2954C8] py-3 text-sm font-semibold text-white transition hover:bg-[#1f44a5] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? 'Creating account...' : 'Create account'}
+                {submitting ? 'Signing up...' : 'Sign up'}
               </button>
             </form>
 

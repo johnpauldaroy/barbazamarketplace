@@ -12,7 +12,7 @@ const EXPLORE_LINKS = [
 
 const ACCOUNT_LINKS = [
   { to: '/login', label: 'Log in' },
-  { to: '/register', label: 'Create account' },
+  { to: '/register', label: 'Sign up' },
   { to: '/account', label: 'My orders' },
   { to: '/cart', label: 'Shopping cart' },
 ];
