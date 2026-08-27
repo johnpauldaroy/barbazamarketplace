@@ -26,6 +26,10 @@ const NAV_LINKS = [
   { to: '/contact', label: 'Contact' },
 ];
 
+// The desktop main row carries only shopping destinations, so search keeps the
+// space it deserves. About/Contact stay reachable from the utility strip above.
+const PRIMARY_NAV_ROUTES = ['/', '/products', '/stores'];
+
 const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
   const brandLogoSrc = '/brand-logo-transparent.png';
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,25 +59,27 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full">
+    <header className="sticky top-0 z-50 w-full sm:-top-8">
       {/* Announcement bar — hidden on mobile to avoid tiny tap-target links */}
       <div className="hidden bg-[#0b1739] text-white sm:block">
-        <div className="section flex h-9 items-center justify-between text-xs">
-          <span className="text-white/65">
+        <div className="section flex h-8 items-center justify-between text-[11px]">
+          {/* Passive context sits quieter than the links beside it. */}
+          <span className="text-white/45">
             Community-first commerce · Barbaza, Antique, Philippines
           </span>
-          <div className="flex items-center gap-4 text-white/75">
-            <Link to="/about" className="hover:text-white transition-colors">About us</Link>
-            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
-            <span className="text-white/35">|</span>
-            <span>Mon–Fri 8AM–5PM</span>
+          <div className="flex items-center gap-3 text-white/70">
+            <Link to="/about" className="transition-colors hover:text-white">About us</Link>
+            <span className="text-white/20" aria-hidden="true">·</span>
+            <Link to="/contact" className="transition-colors hover:text-white">Contact</Link>
+            <span className="text-white/20" aria-hidden="true">·</span>
+            <span className="text-white/45">Mon–Fri 8AM–5PM</span>
           </div>
         </div>
       </div>
 
       {/* Main nav */}
       <div className="border-b border-[#dfe7f4] bg-white/95 shadow-sm backdrop-blur-xl">
-        <div className="section flex h-16 items-center gap-4">
+        <div className="section flex h-16 items-center gap-4 xl:gap-6">
 
           {/* Logo — min 40px touch target */}
           <Link to="/" className="flex shrink-0 items-center gap-2.5" onClick={() => setMobileOpen(false)}>
@@ -88,9 +94,9 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
           {!isStaff && (
             <form
               onSubmit={handleSearch}
-              className="flex flex-1 max-w-xl items-center gap-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd] transition-colors focus-within:border-[#2954C8] focus-within:bg-white"
+              className="flex flex-1 max-w-2xl items-center gap-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd] transition-colors focus-within:border-[#2954C8] focus-within:bg-white"
             >
-              <Search className="ml-3 h-4 w-4 shrink-0 text-slate-400" />
+              <Search className="ml-3 h-4 w-4 shrink-0 text-slate-400 sm:hidden" />
               <input
                 type="search"
                 value={searchQuery}
@@ -100,9 +106,10 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
               />
               <button
                 type="submit"
-                className="m-1 hidden rounded-md bg-[#2954C8] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1f44a5] sm:block"
+                aria-label="Search"
+                className="m-1 hidden h-8 w-10 shrink-0 items-center justify-center rounded-md bg-[#2954C8] text-white transition hover:bg-[#1f44a5] sm:flex"
               >
-                Search
+                <Search className="h-4 w-4" />
               </button>
             </form>
           )}
@@ -113,7 +120,7 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
           {/* Desktop nav links */}
           {!isStaff && (
             <nav className="hidden items-center gap-0.5 xl:flex">
-              {NAV_LINKS.map((link) => (
+              {NAV_LINKS.filter((link) => PRIMARY_NAV_ROUTES.includes(link.to)).map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -191,7 +198,7 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
               <div className="hidden items-center gap-2 md:flex">
                 <Link
                   to="/login"
-                  className="rounded-lg border border-[#dfe7f4] bg-white px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:border-[#2954C8] hover:text-[#2954C8] transition-colors"
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-[#2954C8]"
                 >
                   Log in
                 </Link>
@@ -210,7 +217,7 @@ const Header = ({ mobileOpen = false, setMobileOpen = () => {} }) => {
                 type="button"
                 onClick={() => setIsCartOpen(true)}
                 aria-label="Open cart"
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2954C8] text-white transition hover:bg-[#1f44a5]"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#dfe7f4] bg-white text-slate-700 transition hover:border-[#2954C8] hover:text-[#2954C8]"
               >
                 <ShoppingCart className="h-4 w-4" />
                 {cartCount > 0 && (

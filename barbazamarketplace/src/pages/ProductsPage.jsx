@@ -32,8 +32,8 @@ const resolveStoreLocation = (store) =>
 
 const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('newest');
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || '');
   const [selectedLocation, setSelectedLocation] = useState(() => searchParams.get('location') || '');
@@ -53,6 +53,7 @@ const ProductsPage = () => {
 
   // Sync URL params → state when URL changes externally (e.g. from homepage links)
   useEffect(() => {
+    setSearchQuery(searchParams.get('search') || '');
     setSelectedCategory(searchParams.get('category') || '');
     setSelectedLocation(searchParams.get('location') || '');
   }, [searchParams]);
@@ -60,10 +61,11 @@ const ProductsPage = () => {
   // Keep URL in sync with filter state
   useEffect(() => {
     const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
     if (selectedCategory) params.category = selectedCategory;
     if (selectedLocation) params.location = selectedLocation;
     setSearchParams(params, { replace: true });
-  }, [selectedCategory, selectedLocation, setSearchParams]);
+  }, [debouncedSearch, selectedCategory, selectedLocation, setSearchParams]);
 
   // Load available locations from stores once
   useEffect(() => {
