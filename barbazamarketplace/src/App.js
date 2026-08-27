@@ -138,7 +138,7 @@ const AppLayout = () => {
         'min-h-screen flex flex-col bg-transparent',
         // Reserve room for the fixed mobile bottom bar so footers and
         // page-ending CTAs are never hidden behind it.
-        !isPortalPage && 'pb-[calc(64px+env(safe-area-inset-bottom,0px))] xl:pb-0'
+        !isPortalPage && 'pb-[calc(72px+env(safe-area-inset-bottom,0px))] xl:pb-0'
       )}
     >
       <Helmet>

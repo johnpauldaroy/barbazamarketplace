@@ -141,10 +141,15 @@ const HomePage = () => {
         <div className="section relative py-10 md:py-20">
           {/* Mobile hero image — shows below lg */}
           <div className="mb-6 overflow-hidden rounded-xl lg:hidden">
+            {/* A fixed height stretched this square source into anything from
+                1.6:1 to 4:1 across devices; a set ratio keeps the crop stable. */}
             <img
               src="/assets/images/local_farmer_antique.png"
               alt="Local farmers in Barbaza"
-              className="h-44 w-full object-cover object-center"
+              loading="eager"
+              width="640"
+              height="640"
+              className="aspect-[4/3] w-full object-cover object-center sm:aspect-[16/9]"
             />
           </div>
 

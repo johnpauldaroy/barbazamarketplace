@@ -62,7 +62,7 @@ const MobileBottomNav = ({ onOpenMenu, menuOpen }) => {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         aria-label="Primary"
       >
-        <div className="relative mx-auto flex h-[64px] max-w-lg items-stretch pb-1.5">
+        <div className="relative mx-auto flex h-[72px] max-w-lg items-stretch pb-1.5">
           {/* Equal-width flanks keep the raised cart button on the true centre line. */}
           <div className="flex flex-1 items-stretch">{leftItems.map(renderTab)}</div>
 
@@ -78,8 +78,8 @@ const MobileBottomNav = ({ onOpenMenu, menuOpen }) => {
             </Link>
             <span
               className={cn(
-                'absolute bottom-3 w-full truncate text-center text-[10px] font-medium leading-none',
-                isActive('/products') ? 'text-[#2954C8]' : 'text-slate-500'
+                'absolute bottom-[14px] w-full truncate text-center text-[11px] font-semibold leading-none',
+                isActive('/products') ? 'text-[#2954C8]' : 'text-slate-700'
               )}
             >
               Shop
