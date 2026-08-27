@@ -241,7 +241,8 @@ class ProductController extends Controller
             'category' => 'required|string|max:100',
             'store_id' => 'nullable|integer|exists:stores,id',
             'image' => 'nullable',
-            'stock' => 'required|integer|min:0'
+            'stock' => 'required|integer|min:0',
+            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000'
         ]);
 
         $storeId = $request->input('store_id')
@@ -279,7 +280,8 @@ class ProductController extends Controller
             'category' => 'sometimes|required|string|max:100',
             'store_id' => 'nullable|integer|exists:stores,id',
             'image' => 'nullable',
-            'stock' => 'sometimes|required|integer|min:0'
+            'stock' => 'sometimes|required|integer|min:0',
+            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000'
         ]);
 
         $data = $request->except('image');
@@ -316,6 +318,7 @@ class ProductController extends Controller
             'products.*.price'    => 'required|numeric|min:0',
             'products.*.category' => 'required|string|max:100',
             'products.*.stock'    => 'required|integer|min:0',
+            'products.*.low_stock_threshold' => 'nullable|integer|min:0|max:100000',
             'products.*.description' => 'nullable|string',
             'products.*.store_id'    => 'nullable|integer|exists:stores,id',
         ]);
@@ -338,6 +341,8 @@ class ProductController extends Controller
                     'price'       => $row['price'],
                     'category'    => $row['category'],
                     'stock'       => $row['stock'],
+                    // Omitted in most CSV imports; fall back to the column default.
+                    'low_stock_threshold' => $row['low_stock_threshold'] ?? 10,
                     'store_id'    => $storeId,
                     'image'       => null,
                 ]);
@@ -480,6 +485,8 @@ class ProductController extends Controller
             'image' => $product->image,
             'image_url' => $product->image_url,
             'stock' => (int) $product->stock,
+            'low_stock_threshold' => (int) $product->low_stock_threshold,
+            'is_low_stock' => $product->isLowStock(),
             'is_in_stock' => (int) $product->stock > 0,
             'review_summary' => [
                 'average_rating' => round((float) ($product->visible_reviews_average_rating ?? 0), 2),

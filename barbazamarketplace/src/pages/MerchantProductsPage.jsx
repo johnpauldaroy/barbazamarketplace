@@ -19,6 +19,7 @@ const INITIAL_FORM = {
   category: '',
   price: '',
   stock: '',
+  lowStockThreshold: '10',
   description: '',
   imageFile: null,
 };
@@ -121,6 +122,7 @@ const MerchantProductsPage = () => {
       category: product?.category || '',
       price: product?.price != null ? String(product.price) : '',
       stock: product?.stock != null ? String(product.stock) : '',
+      lowStockThreshold: product?.low_stock_threshold != null ? String(product.low_stock_threshold) : '10',
       description: product?.description || '',
       imageFile: null,
     });
@@ -144,8 +146,10 @@ const MerchantProductsPage = () => {
     const description = form.description.trim();
     const parsedPrice = Number(form.price);
     const parsedStock = Number(form.stock);
+    const rawThreshold = String(form.lowStockThreshold ?? '').trim();
+    const parsedThreshold = rawThreshold === '' ? 10 : Number(rawThreshold);
 
-    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock)) {
+    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedThreshold)) {
       toast({
         title: 'Invalid form input',
         description: 'Title, category, price, and stock are required.',
@@ -159,6 +163,7 @@ const MerchantProductsPage = () => {
       category,
       price: parsedPrice,
       stock: Math.floor(parsedStock),
+      low_stock_threshold: Math.max(0, Math.floor(parsedThreshold)),
       description,
     };
 
@@ -358,6 +363,22 @@ const MerchantProductsPage = () => {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="merchant-product-low-stock">Low stock alert at</Label>
+              <Input
+                id="merchant-product-low-stock"
+                type="number"
+                min="0"
+                step="1"
+                value={form.lowStockThreshold}
+                onChange={(event) => updateFormField('lowStockThreshold', event.target.value)}
+                placeholder="10"
+              />
+              <p className="text-xs text-slate-500">
+                Flag this product as low stock once it falls to this many units. Defaults to 10.
+              </p>
             </div>
 
             <div className="space-y-2">

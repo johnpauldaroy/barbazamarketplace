@@ -20,7 +20,7 @@ const INITIAL_FORM = {
   category: '',
   price: '',
   stock: '',
-  stockThreshold: '5',
+  stockThreshold: '10',
   description: '',
   imageFile: null,
 };
@@ -32,7 +32,7 @@ const normalizeProduct = (product) => ({
   displayAmount: Number(product?.price ?? 0),
   displayImage: resolveProductImage(product?.image_url || product?.image) || null,
   displayStock: Number(product?.stock ?? 0),
-  displayThreshold: Number(product?.stock_threshold ?? 5),
+  displayThreshold: Number(product?.low_stock_threshold ?? 10),
 });
 
 const AdminProductsPage = () => {
@@ -185,7 +185,7 @@ const AdminProductsPage = () => {
       category: product?.category || '',
       price: product?.price != null ? String(product.price) : '',
       stock: product?.stock != null ? String(product.stock) : '',
-      stockThreshold: product?.stock_threshold != null ? String(product.stock_threshold) : '5',
+      stockThreshold: product?.low_stock_threshold != null ? String(product.low_stock_threshold) : '10',
       description: product?.description || '',
       imageFile: null,
     });
@@ -197,7 +197,7 @@ const AdminProductsPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const CSV_TEMPLATE = 'title,category,price,stock,description,store_id\nSample Product,Local Food Products,99,50,Optional description,\n';
+  const CSV_TEMPLATE = 'title,category,price,stock,low_stock_threshold,description,store_id\nSample Product,Local Food Products,99,50,10,Optional description,\n';
 
   const downloadTemplate = () => {
     const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
@@ -238,6 +238,7 @@ const AdminProductsPage = () => {
             category: row.category,
             price: parseFloat(row.price) || 0,
             stock: parseInt(row.stock, 10) || 0,
+            low_stock_threshold: row.low_stock_threshold ? parseInt(row.low_stock_threshold, 10) : null,
             description: row.description || null,
             store_id: row.store_id ? parseInt(row.store_id, 10) : null,
             _valid: Boolean(row.title && row.category && row.price > 0),
@@ -311,7 +312,7 @@ const AdminProductsPage = () => {
       store_id: parsedStoreId || undefined,
       price: parsedPrice,
       stock: Math.floor(parsedStock),
-      stock_threshold: Math.floor(parsedThreshold),
+      low_stock_threshold: Math.floor(parsedThreshold),
       description,
     };
 
@@ -476,11 +477,11 @@ const AdminProductsPage = () => {
                         <div className="flex items-center gap-2">
                           <div
                             className={`h-1.5 w-1.5 rounded-full ${
-                              product.displayStock > (product.stock_threshold ?? 5) ? 'bg-emerald-500' : product.displayStock > 0 ? 'bg-amber-500' : 'bg-rose-500'
+                              product.displayStock > (product.low_stock_threshold ?? 10) ? 'bg-emerald-500' : product.displayStock > 0 ? 'bg-amber-500' : 'bg-rose-500'
                             }`}
                           />
                           <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock 
-                            <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(Alert: {product.stock_threshold ?? 5})</span></p>
+                            <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(Alert: {product.low_stock_threshold ?? 10})</span></p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -617,7 +618,7 @@ const AdminProductsPage = () => {
                   step="1"
                   value={form.stockThreshold}
                   onChange={(event) => updateFormField('stockThreshold', event.target.value)}
-                  placeholder="5"
+                  placeholder="10"
                   required
                 />
               </div>
@@ -711,7 +712,7 @@ const AdminProductsPage = () => {
             <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
               <div>
                 <p className="text-sm font-semibold text-slate-700">Download template</p>
-                <p className="text-xs text-slate-500">Required columns: title, category, price, stock. Optional: description, store_id</p>
+                <p className="text-xs text-slate-500">Required columns: title, category, price, stock. Optional: low_stock_threshold, description, store_id</p>
               </div>
               <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={downloadTemplate}>
                 <Download className="h-3.5 w-3.5" />

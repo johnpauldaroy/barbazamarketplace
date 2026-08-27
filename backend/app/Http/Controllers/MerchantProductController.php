@@ -88,6 +88,7 @@ class MerchantProductController extends Controller
             'category' => 'required|string|max:100',
             'image' => 'nullable',
             'stock' => 'required|integer|min:0',
+            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000',
         ]);
 
         $data = $request->except('image');
@@ -123,6 +124,7 @@ class MerchantProductController extends Controller
             'category' => 'sometimes|required|string|max:100',
             'image' => 'nullable',
             'stock' => 'sometimes|required|integer|min:0',
+            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000',
         ]);
 
         $data = $request->except('image');
@@ -297,6 +299,8 @@ class MerchantProductController extends Controller
             'image' => $product->image,
             'image_url' => $product->image_url,
             'stock' => (int) $product->stock,
+            'low_stock_threshold' => (int) $product->low_stock_threshold,
+            'is_low_stock' => $product->isLowStock(),
             'is_in_stock' => (int) $product->stock > 0,
             'review_summary' => [
                 'average_rating' => round((float) ($product->visible_reviews_average_rating ?? 0), 2),

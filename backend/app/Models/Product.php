@@ -17,10 +17,13 @@ class Product extends Model
         'category',
         'image',
         'stock',
+        'low_stock_threshold',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
+        'stock' => 'integer',
+        'low_stock_threshold' => 'integer',
     ];
 
     protected static function booted(): void
@@ -32,6 +35,22 @@ class Product extends Model
 
             $product->store_id = Store::ensurePlatformStore()->id;
         });
+    }
+
+    /**
+     * A product is low on stock when it still has units left but has fallen to
+     * or below its own threshold. Out-of-stock (0) is a separate state and is
+     * deliberately excluded here so the two dashboard counts do not overlap.
+     */
+    public function isLowStock(): bool
+    {
+        return $this->stock > 0 && $this->stock <= $this->low_stock_threshold;
+    }
+
+    public function scopeLowStock($query)
+    {
+        return $query->where('stock', '>', 0)
+            ->whereColumn('stock', '<=', 'low_stock_threshold');
     }
 
     public function orderItems()

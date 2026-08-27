@@ -121,7 +121,7 @@ class OrderController extends Controller
             ->values();
 
         $lowStockProducts = $products
-            ->filter(fn (Product $product) => (int) $product->stock <= 10)
+            ->filter(fn (Product $product) => $product->isLowStock())
             ->sortBy('stock')
             ->take(6)
             ->map(fn (Product $product) => [
@@ -158,7 +158,7 @@ class OrderController extends Controller
                 'unique_customers' => $uniqueCustomers,
                 'total_products' => $products->count(),
                 'active_categories' => $products->pluck('category')->filter()->unique()->count(),
-                'low_stock_products' => $products->filter(fn (Product $product) => (int) $product->stock <= 10)->count(),
+                'low_stock_products' => $products->filter(fn (Product $product) => $product->isLowStock())->count(),
                 'out_of_stock_products' => $products->filter(fn (Product $product) => (int) $product->stock <= 0)->count(),
             ],
             'monthly_sales' => $monthlySales,
@@ -360,7 +360,7 @@ class OrderController extends Controller
             ->sortBy('date')->values();
 
         // Low stock products
-        $lowStock = $products->filter(fn (Product $p) => (int)$p->stock <= 10)
+        $lowStock = $products->filter(fn (Product $p) => $p->isLowStock())
             ->sortBy('stock')->take(10)
             ->map(fn (Product $p) => [
                 'id'       => $p->id,
