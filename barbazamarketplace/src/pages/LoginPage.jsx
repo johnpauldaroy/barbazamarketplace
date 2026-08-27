@@ -1,41 +1,74 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, MailWarning, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-
-const resolveRedirect = (param) => {
-  if (!param || typeof param !== 'string') return '/';
-  if (!param.startsWith('/') || param.startsWith('//')) return '/';
-  return param;
-};
+import { resendVerificationEmail } from '../api/EcommerceApi';
+import { normalizeEmail, resolveAuthRedirect, savePendingVerification } from '../lib/authFlow';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login } = useAuth();
-  const redirectPath = resolveRedirect(searchParams.get('redirect'));
+  const redirectPath = resolveAuthRedirect(searchParams.get('redirect'));
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [showPw, setShowPw] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const timer = window.setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  const handleChange = (e) => {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    setError(null);
+    setVerificationRequired(false);
+    setResendMessage('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      const data = await login(form);
+      const normalizedEmail = normalizeEmail(form.email);
+      const data = await login({ ...form, email: normalizedEmail });
       if (data?.user?.is_admin) navigate('/admin', { replace: true });
       else if (data?.user?.is_merchant) navigate('/merchant', { replace: true });
       else navigate(redirectPath, { replace: true });
     } catch (err) {
-      setError(err?.message || 'Login failed. Please check your credentials.');
+      if (err?.code === 'EMAIL_NOT_VERIFIED') {
+        const normalizedEmail = normalizeEmail(form.email);
+        savePendingVerification({ email: normalizedEmail, redirect: redirectPath, emailSent: true });
+        setVerificationRequired(true);
+        setError(null);
+      } else {
+        setError(err?.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    setResendMessage('');
+    try {
+      const data = await resendVerificationEmail(normalizeEmail(form.email));
+      setResendMessage(data?.message || 'If the account is awaiting verification, a new email will arrive shortly.');
+      setCooldown(60);
+    } catch (err) {
+      setResendMessage(err?.message || 'Unable to request another email. Please try again.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -66,6 +99,24 @@ const LoginPage = () => {
               </div>
             )}
 
+            {verificationRequired && (
+              <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left" role="alert">
+                <div className="flex gap-3">
+                  <MailWarning className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Verify your email before logging in.</p>
+                    <p className="mt-1 text-xs leading-5 text-amber-800">Open the link in your verification email, or request a new one.</p>
+                    {resendMessage && <p className="mt-2 text-xs font-medium text-amber-900" role="status">{resendMessage}</p>}
+                    <button type="button" onClick={handleResend} disabled={resending || cooldown > 0}
+                      className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
+                      <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
+                      {resending ? 'Requesting...' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-[#0b1739]">
@@ -79,7 +130,7 @@ const LoginPage = () => {
                   required
                   value={form.email}
                   onChange={handleChange}
-                  className="h-11 w-full rounded-lg border border-[#dfe7f4] bg-[#f8fafd] px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#2954C8] focus:bg-white focus:ring-2 focus:ring-[#2954C8]/10"
+                  className="h-11 w-full rounded-lg border border-[#dfe7f4] bg-[#f8fafd] px-4 text-base text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#2954C8] focus:bg-white focus:ring-2 focus:ring-[#2954C8]/10"
                   placeholder="you@example.com"
                 />
               </div>
@@ -97,7 +148,7 @@ const LoginPage = () => {
                     required
                     value={form.password}
                     onChange={handleChange}
-                    className="h-11 w-full rounded-lg border border-[#dfe7f4] bg-[#f8fafd] px-4 pr-11 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#2954C8] focus:bg-white focus:ring-2 focus:ring-[#2954C8]/10"
+                    className="h-11 w-full rounded-lg border border-[#dfe7f4] bg-[#f8fafd] px-4 pr-11 text-base text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#2954C8] focus:bg-white focus:ring-2 focus:ring-[#2954C8]/10"
                     placeholder="••••••••"
                   />
                   <button

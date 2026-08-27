@@ -55,9 +55,7 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             setError(null);
-            const data = await registerUser(userData);
-            setUser(data.user || data);
-            return data;
+            return await registerUser(userData);
         } catch (err) {
             setError(err.message);
             throw err;

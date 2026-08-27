@@ -42,6 +42,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const MerchantDashboard = lazy(() => import('./pages/MerchantDashboard'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 
@@ -88,6 +89,7 @@ const AppRoutes = () =>
     { path: '/feedback/:token', element: <OrderFeedbackPage /> },
     { path: '/login', element: <LoginPage /> },
     { path: '/register', element: <RegisterPage /> },
+    { path: '/verify-email', element: <VerifyEmailPage /> },
     {
       path: '/admin',
       element: (

@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Store;
 use App\Models\User;
+use App\Services\EmailVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class AdminStoreController extends Controller
 {
@@ -193,14 +195,19 @@ class AdminStoreController extends Controller
         ]);
     }
 
-    public function storeMerchant(Request $request, int $storeId)
+    public function storeMerchant(Request $request, int $storeId, EmailVerificationService $emailVerification)
     {
         $store = Store::query()->findOrFail($storeId);
 
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'email' => Str::lower(trim((string) $request->input('email'))),
+        ]);
+
         $payload = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'email' => ['required', 'string', 'email:rfc', 'max:254', 'unique:users,email'],
+            'password' => ['required', 'string', 'max:72', Password::min(8), 'confirmed'],
         ]);
 
         $merchant = User::create([
@@ -211,11 +218,14 @@ class AdminStoreController extends Controller
             'is_merchant' => true,
             'store_id' => $store->id,
         ]);
+        $emailSent = $emailVerification->send($merchant);
 
         $merchant->load('store');
 
         return response()->json([
             'message' => 'Merchant created successfully',
+            'verification_required' => true,
+            'verification_email_sent' => $emailSent,
             'merchant' => $this->formatMerchant($merchant),
         ], 201);
     }
@@ -224,10 +234,17 @@ class AdminStoreController extends Controller
     {
         $merchant = User::query()->findOrFail($userId);
 
+        if ($request->has('name')) {
+            $request->merge(['name' => trim((string) $request->input('name'))]);
+        }
+        if ($request->has('email')) {
+            $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        }
+
         $payload = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($merchant->id)],
-            'password' => 'nullable|string|min:8|confirmed',
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
+            'email' => ['sometimes', 'required', 'string', 'email:rfc', 'max:254', Rule::unique('users', 'email')->ignore($merchant->id)],
+            'password' => ['nullable', 'string', 'max:72', Password::min(8), 'confirmed'],
             'is_merchant' => 'nullable|boolean',
             'store_id' => 'nullable|integer|exists:stores,id',
         ]);
@@ -239,7 +256,7 @@ class AdminStoreController extends Controller
             ? $payload['store_id']
             : $merchant->store_id;
 
-        if ($nextIsMerchant && !$nextStoreId) {
+        if ($nextIsMerchant && ! $nextStoreId) {
             return response()->json([
                 'message' => 'Merchant accounts must be assigned to a store.',
             ], 422);
@@ -251,7 +268,7 @@ class AdminStoreController extends Controller
         if (array_key_exists('email', $payload)) {
             $merchant->email = trim($payload['email']);
         }
-        if (!empty($payload['password'])) {
+        if (! empty($payload['password'])) {
             $merchant->password = Hash::make($payload['password']);
         }
 
@@ -307,6 +324,7 @@ class AdminStoreController extends Controller
             'id' => $merchant->id,
             'name' => $merchant->name,
             'email' => $merchant->email,
+            'email_verified' => $merchant->hasVerifiedEmail(),
             'is_admin' => (bool) $merchant->is_admin,
             'is_merchant' => (bool) $merchant->is_merchant,
             'store_id' => $merchant->store_id,
@@ -328,12 +346,13 @@ class AdminStoreController extends Controller
         }
 
         $normalized = trim((string) $value);
+
         return $normalized === '' ? null : $normalized;
     }
 
     protected function storeImageFile(?UploadedFile $file, string $directory): ?string
     {
-        if (!$file) {
+        if (! $file) {
             return null;
         }
 
@@ -343,7 +362,7 @@ class AdminStoreController extends Controller
     protected function removeManagedStoreImage(?string $storedValue): void
     {
         $path = $this->extractStoragePath($storedValue);
-        if (!$path) {
+        if (! $path) {
             return;
         }
 
@@ -352,7 +371,7 @@ class AdminStoreController extends Controller
 
     protected function toImageUrl(?string $storedValue): ?string
     {
-        if (!$storedValue) {
+        if (! $storedValue) {
             return null;
         }
 
@@ -366,16 +385,16 @@ class AdminStoreController extends Controller
         }
 
         $path = $this->extractStoragePath($normalized);
-        if (!$path) {
+        if (! $path) {
             return $normalized;
         }
 
-        return '/storage/' . $path;
+        return '/storage/'.$path;
     }
 
     protected function extractStoragePath(?string $storedValue): ?string
     {
-        if (!$storedValue) {
+        if (! $storedValue) {
             return null;
         }
 

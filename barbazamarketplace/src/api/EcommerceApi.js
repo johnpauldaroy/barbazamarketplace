@@ -2,6 +2,16 @@
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
+export class ApiError extends Error {
+    constructor(message, { status = 0, code = null, errors = {} } = {}) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.code = code;
+        this.errors = errors;
+    }
+}
+
 const parseJsonSafely = async (response) => {
     const text = await response.text();
     if (!text) return null;
@@ -59,7 +69,11 @@ const apiRequest = async (endpoint, options = {}) => {
             (typeof body === 'string' ? body : null) ||
             `${response.status} ${response.statusText}`;
 
-        throw new Error(message);
+        throw new ApiError(message, {
+            status: response.status,
+            code: body?.code || null,
+            errors: body?.errors || {},
+        });
     }
 
     return parseJsonSafely(response);
@@ -118,39 +132,30 @@ export const fetchProductById = async (id) => {
 
 // Authentication APIs
 export const loginUser = async (credentials) => {
-    try {
-        const data = await apiRequest('/login', {
-            method: 'POST',
-            body: JSON.stringify(credentials)
-        });
-        
-        const token = data.token || data.access_token;
-        if (token) {
-            localStorage.setItem('auth_token', token);
-        }
-        return data;
-    } catch (error) {
-        console.error('Login error:', error);
-        throw error;
+    const data = await apiRequest('/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials)
+    });
+
+    const token = data.token || data.access_token;
+    if (token) {
+        localStorage.setItem('auth_token', token);
     }
+    return data;
 };
 
 export const registerUser = async (userData) => {
-    try {
-        const data = await apiRequest('/register', {
-            method: 'POST',
-            body: JSON.stringify(userData)
-        });
-        
-        const token = data.token || data.access_token;
-        if (token) {
-            localStorage.setItem('auth_token', token);
-        }
-        return data;
-    } catch (error) {
-        console.error('Registration error:', error);
-        throw error;
-    }
+    return apiRequest('/register', {
+        method: 'POST',
+        body: JSON.stringify(userData)
+    });
+};
+
+export const resendVerificationEmail = async (email) => {
+    return apiRequest('/email/verification-notification', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+    });
 };
 
 export const logoutUser = async () => {

@@ -156,10 +156,15 @@ class MultiTenantMerchantTest extends TestCase
             'store_id' => 999,
         ]);
 
-        $response->assertOk();
-        $response->assertJsonPath('user.is_admin', false);
-        $response->assertJsonPath('user.is_merchant', false);
-        $response->assertJsonPath('user.store_id', null);
+        $response->assertCreated();
+        $response->assertJsonPath('verification_required', true);
+        $response->assertJsonMissingPath('token');
+
+        $user = User::query()->where('email', 'customer-one@example.com')->firstOrFail();
+        $this->assertFalse($user->is_admin);
+        $this->assertFalse($user->is_merchant);
+        $this->assertNull($user->store_id);
+        $this->assertNull($user->email_verified_at);
     }
 
     public function test_category_uniqueness_is_scoped_per_store(): void

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\EmailVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class AdminUserController extends Controller
 {
@@ -47,12 +50,17 @@ class AdminUserController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, EmailVerificationService $emailVerification)
     {
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'email' => Str::lower(trim((string) $request->input('email'))),
+        ]);
+
         $payload = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'email' => ['required', 'string', 'email:rfc', 'max:254', 'unique:users,email'],
+            'password' => ['required', 'string', 'max:72', Password::min(8), 'confirmed'],
             'is_admin' => 'nullable|boolean',
         ]);
 
@@ -64,9 +72,12 @@ class AdminUserController extends Controller
             'is_merchant' => false,
             'store_id' => null,
         ]);
+        $emailSent = $emailVerification->send($user);
 
         return response()->json([
             'message' => 'User created successfully',
+            'verification_required' => true,
+            'verification_email_sent' => $emailSent,
             'user' => $this->formatUser($user->load('store')),
         ], 201);
     }
@@ -80,14 +91,21 @@ class AdminUserController extends Controller
             ], 422);
         }
 
+        if ($request->has('name')) {
+            $request->merge(['name' => trim((string) $request->input('name'))]);
+        }
+        if ($request->has('email')) {
+            $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        }
+
         $payload = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => 'nullable|string|min:8|confirmed',
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
+            'email' => ['sometimes', 'required', 'string', 'email:rfc', 'max:254', Rule::unique('users', 'email')->ignore($user->id)],
+            'password' => ['nullable', 'string', 'max:72', Password::min(8), 'confirmed'],
             'is_admin' => 'nullable|boolean',
         ]);
 
-        if ($request->user()->id === $user->id && array_key_exists('is_admin', $payload) && !$payload['is_admin']) {
+        if ($request->user()->id === $user->id && array_key_exists('is_admin', $payload) && ! $payload['is_admin']) {
             return response()->json([
                 'message' => 'You cannot remove your own admin access.',
             ], 422);
@@ -102,7 +120,7 @@ class AdminUserController extends Controller
         if (array_key_exists('is_admin', $payload)) {
             $user->is_admin = (bool) $payload['is_admin'];
         }
-        if (!empty($payload['password'])) {
+        if (! empty($payload['password'])) {
             $user->password = Hash::make($payload['password']);
         }
 
@@ -142,6 +160,7 @@ class AdminUserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'email_verified' => $user->hasVerifiedEmail(),
             'is_admin' => (bool) $user->is_admin,
             'is_merchant' => (bool) $user->is_merchant,
             'store_id' => $user->store_id,

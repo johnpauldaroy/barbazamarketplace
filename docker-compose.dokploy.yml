@@ -36,6 +36,11 @@ services:
       SESSION_DRIVER: database
       CACHE_STORE: database
       QUEUE_CONNECTION: sync
+      MAIL_MAILER: resend
+      MAIL_FROM_ADDRESS: no-reply@barbazampc.cloud
+      MAIL_FROM_NAME: "e-KoopMart"
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      AUTH_EMAIL_VERIFICATION_EXPIRE: "60"
       FILESYSTEM_DISK: public
       RUN_MIGRATIONS: "1"
       MIGRATION_MAX_ATTEMPTS: "30"
