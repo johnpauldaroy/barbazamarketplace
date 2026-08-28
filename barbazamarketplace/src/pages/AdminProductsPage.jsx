@@ -193,6 +193,21 @@ const AdminProductsPage = () => {
     setIsFormDialogOpen(true);
   };
 
+  // The editor owns the variant list; mirror its result onto the product row so
+  // the table and a re-opened dialog do not show a stale set.
+  const handleVariantsChange = (variants) => {
+    const activeCount = variants.filter((variant) => variant.is_active).length;
+
+    setEditingProduct((prev) => (prev ? { ...prev, variants, has_variants: activeCount > 1 } : prev));
+    setProducts((prev) =>
+      prev.map((item) =>
+        item.id === editingProduct?.id
+          ? normalizeProduct({ ...item, variants, has_variants: activeCount > 1 })
+          : item
+      )
+    );
+  };
+
   const openDeleteDialog = (product) => {
     setDeletingProduct(product);
     setIsDeleteDialogOpen(true);
@@ -667,6 +682,7 @@ const AdminProductsPage = () => {
                 productId={editingProduct.id}
                 baseUnitCode={editingProduct.base_unit?.code || 'pc'}
                 stock={editingProduct.stock}
+                onVariantsChange={handleVariantsChange}
               />
             ) : (
               <div className="rounded-lg border border-dashed border-[#dfe7f4] bg-[#f8fafd] p-3">

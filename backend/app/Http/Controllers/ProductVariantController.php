@@ -34,8 +34,12 @@ class ProductVariantController extends Controller
     {
         $product = $this->authorizeProduct($request, $productId);
 
+        // Products predating the variants rollout have none; give them the
+        // default they should already have had so the editor is never empty.
+        $product->ensureDefaultVariant();
+
         return response()->json([
-            'variants' => $this->serialize($product),
+            'variants' => $this->serialize($product->fresh()),
         ]);
     }
 

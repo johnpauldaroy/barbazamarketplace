@@ -20,7 +20,7 @@ const emptyDraft = { name: '', base_unit_quantity: '1', price: '', is_default: f
  * from the same pool. That ratio is the field merchants most often get wrong,
  * so every row spells it out in words.
  */
-const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0 }) => {
+const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0, onVariantsChange }) => {
   const { toast } = useToast();
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,9 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0 }) =>
         price: Number(draft.price || 0),
         is_default: draft.is_default,
       });
-      setVariants(response?.variants || []);
+      const next = response?.variants || [];
+      setVariants(next);
+      onVariantsChange?.(next);
       setDraft(emptyDraft);
       toast({ title: 'Option added' });
     } catch (error) {
@@ -106,7 +108,9 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0 }) =>
         is_default: editDraft.is_default,
         is_active: editDraft.is_active,
       });
-      setVariants(response?.variants || []);
+      const next = response?.variants || [];
+      setVariants(next);
+      onVariantsChange?.(next);
       setEditingId(null);
       toast({ title: 'Option updated' });
     } catch (error) {
@@ -124,7 +128,9 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0 }) =>
     setSaving(true);
     try {
       const response = await deleteProductVariant(productId, variant.id);
-      setVariants(response?.variants || []);
+      const next = response?.variants || [];
+      setVariants(next);
+      onVariantsChange?.(next);
       toast({ title: response?.message || 'Option removed' });
     } catch (error) {
       toast({

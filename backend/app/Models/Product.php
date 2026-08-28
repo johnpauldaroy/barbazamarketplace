@@ -81,6 +81,37 @@ class Product extends Model
      * The variant pre-selected on the product page. Falls back to the first
      * active variant so a product whose default was deactivated still sells.
      */
+    /**
+     * Guarantee this product has at least one sellable option.
+     *
+     * The backfill migration only covered products that existed when it ran, so
+     * anything created before variants were deployed - or imported since - can
+     * still have none. Rather than leave those unsellable, mint the same default
+     * the migration would have made, on first access.
+     */
+    public function ensureDefaultVariant(): ProductVariant
+    {
+        $existing = $this->defaultVariant();
+        if ($existing) {
+            return $existing;
+        }
+
+        $name = trim((string) $this->category);
+
+        $variant = $this->variants()->create([
+            'name' => $name !== '' ? $name : 'Default',
+            'base_unit_quantity' => 1,
+            'price' => $this->price,
+            'is_default' => true,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $this->unsetRelation('variants');
+
+        return $variant;
+    }
+
     public function defaultVariant(): ?ProductVariant
     {
         $variants = $this->relationLoaded('variants')

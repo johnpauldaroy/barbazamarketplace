@@ -237,6 +237,48 @@ class VariantManagementTest extends TestCase
         $this->assertFalse((bool) $sack->fresh()->is_active);
     }
 
+    public function test_product_without_variants_is_healed_on_open(): void
+    {
+        // Mirrors production: products created before the variants rollout (or
+        // after the backfill ran) have no options at all.
+        $legacy = Product::create([
+            'store_id' => $this->store->id,
+            'title' => 'Pancit Canton',
+            'price' => 45,
+            'category' => 'Noodles',
+            'stock' => 12,
+        ]);
+
+        $this->assertSame(0, $legacy->variants()->count());
+
+        Sanctum::actingAs($this->merchant);
+
+        $response = $this->getJson("/api/products/{$legacy->id}/variants")->assertOk();
+
+        $variants = $response->json('variants');
+        $this->assertCount(1, $variants);
+        $this->assertSame('Noodles', $variants[0]['name']);
+        $this->assertTrue($variants[0]['is_default']);
+        $this->assertSame(12, $variants[0]['available_quantity']);
+    }
+
+    public function test_healing_is_idempotent(): void
+    {
+        $legacy = Product::create([
+            'store_id' => $this->store->id,
+            'title' => 'Miswa', 'price' => 12, 'category' => '', 'stock' => 3,
+        ]);
+
+        Sanctum::actingAs($this->merchant);
+
+        $this->getJson("/api/products/{$legacy->id}/variants")->assertOk();
+        $this->getJson("/api/products/{$legacy->id}/variants")->assertOk();
+
+        // Opening the editor twice must not stack duplicate defaults.
+        $this->assertSame(1, $legacy->variants()->count());
+        $this->assertSame('Default', $legacy->variants()->first()->name);
+    }
+
     public function test_customer_cannot_manage_variants(): void
     {
         Sanctum::actingAs(User::factory()->create());
