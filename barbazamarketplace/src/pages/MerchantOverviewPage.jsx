@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Boxes, ShoppingCart, Store, Wallet } from 'lucide-react';
+import { Boxes, CalendarRange, Download, FileSpreadsheet, FileText, RotateCcw, Search, ShoppingCart, Store, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import {
   Bar,
   BarChart,
@@ -19,6 +21,7 @@ import {
 import { fetchMerchantOrders, fetchMerchantProducts, fetchMerchantStore } from '../api/EcommerceApi';
 import { useToast } from '../components/ui/use-toast';
 import { formatPeso } from '../lib/marketplace';
+import { exportMerchantReportCsv, exportMerchantReportExcel, exportMerchantReportPdf } from '../lib/merchantReportExport';
 
 const MERCHANT_OVERVIEW_PAGE_SIZE = 24;
 const MERCHANT_ORDERS_PAGE_SIZE = 100;
@@ -32,6 +35,37 @@ const STATUS_COLORS = {
   refunded: '#94A3B8',
 };
 const NON_REVENUE_STATUSES = new Set(['cancelled', 'refunded']);
+const PAYMENT_STATUS_SEQUENCE = ['unpaid', 'under_review', 'paid', 'rejected', 'refunded'];
+
+const toDateInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const dateRangeForPreset = (preset) => {
+  const now = new Date();
+  const end = toDateInput(now);
+  const start = new Date(now);
+
+  if (preset === 'all') return { from: '', to: '' };
+  if (preset === 'this_year') return { from: `${now.getFullYear()}-01-01`, to: end };
+  if (preset === 'last_7_days') start.setDate(now.getDate() - 6);
+  else if (preset === 'last_30_days') start.setDate(now.getDate() - 29);
+  else if (preset === 'last_90_days') start.setDate(now.getDate() - 89);
+  else start.setMonth(now.getMonth() - 5, 1);
+
+  return { from: toDateInput(start), to: end };
+};
+
+const defaultFilters = () => ({
+  preset: 'last_6_months',
+  ...dateRangeForPreset('last_6_months'),
+  status: 'all',
+  paymentStatus: 'all',
+  search: '',
+});
 
 const toMonthKey = (date) => {
   const year = date.getFullYear();
@@ -53,6 +87,8 @@ const MerchantOverviewPage = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState(defaultFilters);
+  const [exporting, setExporting] = useState('');
 
   const loadAllProducts = useCallback(async () => {
     let page = 1;
@@ -130,9 +166,35 @@ const MerchantOverviewPage = () => {
     [products]
   );
 
+  const filteredOrders = useMemo(() => {
+    const fromDate = filters.from ? new Date(`${filters.from}T00:00:00`) : null;
+    const toDate = filters.to ? new Date(`${filters.to}T23:59:59.999`) : null;
+    const query = filters.search.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const createdAt = new Date(order?.created_at);
+      if (fromDate && (!Number.isNaN(createdAt.getTime()) && createdAt < fromDate)) return false;
+      if (toDate && (!Number.isNaN(createdAt.getTime()) && createdAt > toDate)) return false;
+      if (filters.status !== 'all' && normalizeOrderStatus(order?.status) !== filters.status) return false;
+      if (filters.paymentStatus !== 'all' && String(order?.payment_status || 'unpaid') !== filters.paymentStatus) return false;
+      if (!query) return true;
+
+      const items = Array.isArray(order?.store_items) ? order.store_items : [];
+      return [
+        order?.id,
+        order?.customer?.name,
+        order?.customer?.email,
+        order?.payment_method_label,
+        order?.payment_method,
+        order?.payment_reference,
+        ...items.flatMap((item) => [item?.name, item?.product_id]),
+      ].filter(Boolean).join(' ').toLowerCase().includes(query);
+    });
+  }, [filters, orders]);
+
   const revenueOrders = useMemo(
-    () => orders.filter((order) => !NON_REVENUE_STATUSES.has(normalizeOrderStatus(order?.status))),
-    [orders]
+    () => filteredOrders.filter((order) => !NON_REVENUE_STATUSES.has(normalizeOrderStatus(order?.status))),
+    [filteredOrders]
   );
 
   const grossRevenue = useMemo(
@@ -161,7 +223,7 @@ const MerchantOverviewPage = () => {
 
     const frameByKey = new Map(frames.map((item) => [item.key, item]));
 
-    orders.forEach((order) => {
+    filteredOrders.forEach((order) => {
       const createdAt = new Date(order?.created_at);
       if (Number.isNaN(createdAt.getTime())) {
         return;
@@ -183,7 +245,7 @@ const MerchantOverviewPage = () => {
       ...frame,
       revenue: Math.round(frame.revenue * 100) / 100,
     }));
-  }, [orders]);
+  }, [filteredOrders]);
 
   const statusBreakdown = useMemo(() => {
     const counts = ORDER_STATUS_SEQUENCE.reduce(
@@ -191,7 +253,7 @@ const MerchantOverviewPage = () => {
       {}
     );
 
-    orders.forEach((order) => {
+    filteredOrders.forEach((order) => {
       const status = normalizeOrderStatus(order?.status);
       if (Object.prototype.hasOwnProperty.call(counts, status)) {
         counts[status] += 1;
@@ -206,7 +268,7 @@ const MerchantOverviewPage = () => {
         color: STATUS_COLORS[status],
       }))
       .filter((item) => item.count > 0);
-  }, [orders]);
+  }, [filteredOrders]);
 
   const topProductsByRevenue = useMemo(() => {
     const totalsByProduct = new Map();
@@ -265,12 +327,135 @@ const MerchantOverviewPage = () => {
       }));
   }, [products]);
 
+  const filterLabel = useMemo(() => {
+    const formatDate = (value) => {
+      if (!value) return '';
+      const date = new Date(`${value}T00:00:00`);
+      return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    if (!filters.from && !filters.to) return 'All available dates';
+    if (filters.from && filters.to) return `${formatDate(filters.from)} – ${formatDate(filters.to)}`;
+    return filters.from ? `From ${formatDate(filters.from)}` : `Through ${formatDate(filters.to)}`;
+  }, [filters.from, filters.to]);
+
+  const exportSummary = useMemo(() => ({
+    orders: filteredOrders.length,
+    grossRevenue,
+    averageOrderValue,
+    products: products.length,
+    inventoryValue,
+  }), [averageOrderValue, filteredOrders.length, grossRevenue, inventoryValue, products.length]);
+
+  const updatePreset = (preset) => setFilters((current) => ({
+    ...current,
+    preset,
+    ...(preset === 'custom' ? {} : dateRangeForPreset(preset)),
+  }));
+
+  const updateDate = (field, value) => setFilters((current) => ({ ...current, preset: 'custom', [field]: value }));
+
+  const handleExport = async (format) => {
+    if (filteredOrders.length === 0) {
+      toast({ title: 'Nothing to export', description: 'Adjust the filters to include at least one order.', variant: 'destructive' });
+      return;
+    }
+
+    setExporting(format);
+    try {
+      const exportData = {
+        orders: filteredOrders,
+        products,
+        storeName: store?.name || 'Merchant',
+        summary: exportSummary,
+        filterLabel,
+      };
+      if (format === 'csv') exportMerchantReportCsv(exportData);
+      if (format === 'excel') await exportMerchantReportExcel(exportData);
+      if (format === 'pdf') await exportMerchantReportPdf(exportData);
+      toast({ title: `${format === 'excel' ? 'Excel' : format.toUpperCase()} report created`, description: `${filteredOrders.length} filtered order${filteredOrders.length === 1 ? '' : 's'} exported.`, variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Export failed', description: error?.message || 'Unable to create the report file.', variant: 'destructive' });
+    } finally {
+      setExporting('');
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">Merchant Dashboard</h2>
         <p className="text-sm text-slate-500">Revenue, orders, inventory, and product performance in one view.</p>
       </div>
+
+      <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#eef3fb] text-[#2954C8]">
+                <CalendarRange className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">Report filters</p>
+                <p className="mt-0.5 text-sm text-slate-500">{filterLabel} · {filteredOrders.length} order{filteredOrders.length === 1 ? '' : 's'}</p>
+              </div>
+            </div>
+            <Button type="button" variant="ghost" className="min-h-11 justify-start gap-2 text-slate-600 sm:justify-center" onClick={() => setFilters(defaultFilters())}>
+              <RotateCcw className="h-4 w-4" /> Reset filters
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Date range
+              <select value={filters.preset} onChange={(event) => updatePreset(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-[#2954C8]">
+                <option value="last_7_days">Last 7 days</option>
+                <option value="last_30_days">Last 30 days</option>
+                <option value="last_90_days">Last 90 days</option>
+                <option value="last_6_months">Last 6 months</option>
+                <option value="this_year">This year</option>
+                <option value="all">All dates</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              From
+              <Input type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => updateDate('from', event.target.value)} className="mt-1.5 min-h-11 rounded-xl text-base font-normal normal-case tracking-normal" />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              To
+              <Input type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => updateDate('to', event.target.value)} className="mt-1.5 min-h-11 rounded-xl text-base font-normal normal-case tracking-normal" />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Order status
+              <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="mt-1.5 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-[#2954C8]">
+                <option value="all">All statuses</option>
+                {ORDER_STATUS_SEQUENCE.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Payment status
+              <select value={filters.paymentStatus} onChange={(event) => setFilters((current) => ({ ...current, paymentStatus: event.target.value }))} className="mt-1.5 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-[#2954C8]">
+                <option value="all">All payments</option>
+                {PAYMENT_STATUS_SEQUENCE.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <label className="relative block flex-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Search report
+              <Search className="pointer-events-none absolute bottom-3.5 left-3.5 h-4 w-4 text-slate-400" />
+              <Input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Order, customer, reference, or product" className="mt-1.5 min-h-11 rounded-xl pl-10 text-base font-normal normal-case tracking-normal" />
+            </label>
+            <div className="grid grid-cols-3 gap-2 xl:w-auto">
+              <Button type="button" variant="outline" disabled={Boolean(exporting) || filteredOrders.length === 0} onClick={() => handleExport('csv')} className="min-h-11 gap-2 rounded-xl px-3"><FileText className="h-4 w-4" /><span>CSV</span></Button>
+              <Button type="button" variant="outline" disabled={Boolean(exporting) || filteredOrders.length === 0} onClick={() => handleExport('excel')} className="min-h-11 gap-2 rounded-xl border-emerald-200 px-3 text-emerald-700 hover:bg-emerald-50"><FileSpreadsheet className="h-4 w-4" /><span>{exporting === 'excel' ? 'Working…' : 'Excel'}</span></Button>
+              <Button type="button" disabled={Boolean(exporting) || filteredOrders.length === 0} onClick={() => handleExport('pdf')} className="min-h-11 gap-2 rounded-xl bg-[#2954C8] px-3"><Download className="h-4 w-4" /><span>{exporting === 'pdf' ? 'Working…' : 'PDF'}</span></Button>
+            </div>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">Date and status filters apply to sales metrics and exports. Product count and inventory value always show current stock.</p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-5">
         <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
