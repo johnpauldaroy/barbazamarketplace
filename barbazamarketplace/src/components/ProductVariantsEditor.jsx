@@ -56,8 +56,7 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0, onVa
     return `${ratio} ${baseUnitCode} each · ${sellable} sellable`;
   };
 
-  const handleCreate = async (event) => {
-    event.preventDefault();
+  const handleCreate = async () => {
     if (!draft.name.trim()) {
       toast({ title: 'Name the option', description: 'For example "5kg Pack".', variant: 'destructive' });
       return;
@@ -283,7 +282,15 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0, onVa
         </ul>
       )}
 
-      <form onSubmit={handleCreate} className="mt-3 space-y-2 border-t border-[#dfe7f4] pt-3">
+      <div
+        className="mt-3 space-y-2 border-t border-[#dfe7f4] pt-3"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            handleCreate();
+          }
+        }}
+      >
         <Input
           value={draft.name}
           onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
@@ -315,11 +322,17 @@ const ProductVariantsEditor = ({ productId, baseUnitCode = 'pc', stock = 0, onVa
         {draft.base_unit_quantity && (
           <p className="text-xs text-slate-500">{describeRatio(draft.base_unit_quantity)}</p>
         )}
-        <Button type="submit" size="sm" className="w-full gap-1.5 bg-[#2954C8]" disabled={saving}>
+        <Button
+          type="button"
+          size="sm"
+          className="w-full gap-1.5 bg-[#2954C8]"
+          disabled={saving}
+          onClick={handleCreate}
+        >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
           Add option
         </Button>
-      </form>
+      </div>
     </div>
   );
 };
