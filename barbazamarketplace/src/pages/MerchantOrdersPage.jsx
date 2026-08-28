@@ -146,19 +146,19 @@ const MerchantOrdersPage = () => {
   return (
     <div className="space-y-6">
       <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold text-slate-800">Store Orders</CardTitle>
+        <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="text-lg font-bold text-slate-800 sm:text-xl">Store Orders</CardTitle>
             <p className="text-sm text-slate-500">Track and process orders assigned to your store.</p>
           </div>
-          <Button variant="outline" className="gap-2 text-xs font-bold rounded-xl border-slate-200" disabled>
+          <Button variant="outline" className="w-full gap-2 text-xs font-bold rounded-xl border-slate-200 sm:w-auto" disabled>
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex flex-wrap gap-4">
-            <div className="relative flex-1 min-w-[300px]">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+            <div className="relative min-w-0 flex-1 sm:min-w-[280px]">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="Search by order ID or customer name..."
@@ -168,12 +168,12 @@ const MerchantOrdersPage = () => {
               />
             </div>
             <div className="flex gap-2">
-              <label className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm">
+              <label className="flex w-full items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm sm:w-auto">
                 <Filter className="mr-2 h-4 w-4 text-slate-400" />
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
-                  className="h-10 bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+                  className="h-10 w-full bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer sm:w-auto"
                 >
                   <option value="all">All Statuses</option>
                   {ORDER_STATUS_OPTIONS.map((status) => (
@@ -186,7 +186,7 @@ const MerchantOrdersPage = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm">
+          <div className="hidden overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm lg:block">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
@@ -289,6 +289,85 @@ const MerchantOrdersPage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: the same orders as stacked cards, since a 7-column table cannot shrink */}
+          <div className="space-y-3 lg:hidden">
+            {loadingOrders ? (
+              <p className="py-12 text-center text-sm text-slate-500">Loading orders...</p>
+            ) : pagedOrders.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-500">No matching orders found.</p>
+            ) : (
+              pagedOrders.map((order) => {
+                const storeSubtotal = Number(order.store_subtotal_amount || 0);
+                const fullTotal = Number(order.total_amount || 0);
+                const showFullTotal = Math.abs(storeSubtotal - fullTotal) > 0.009;
+
+                return (
+                  <div key={order.id} className="rounded-2xl border border-[#ECF1FA] bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800">#{order.id}</p>
+                        <p className="text-[10px] font-medium text-slate-400">{formatOrderDate(order.created_at)}</p>
+                      </div>
+                      <Badge variant={STATUS_VARIANTS[order.status] || 'outline'} className="shrink-0 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider">
+                        {statusLabel(order.status)}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-3 border-t border-slate-100 pt-3">
+                      <p className="truncate text-xs font-bold text-slate-700">{order.customer?.name || 'Guest'}</p>
+                      <p className="truncate text-[10px] font-medium text-slate-400">{order.customer?.email || 'No email'}</p>
+                    </div>
+
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-600">{Number(order.store_item_count || 0)} items</p>
+                        {order.has_other_store_items && (
+                          <p className="text-[10px] font-medium text-amber-600">Includes other-store items</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold text-slate-800">{formatPeso(storeSubtotal)}</p>
+                        {showFullTotal && (
+                          <p className="text-[10px] font-medium text-slate-400">Full order: {formatPeso(fullTotal)}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 flex-1 gap-2 rounded-xl border-slate-200 text-xs font-bold"
+                        onClick={() => handleViewDetails(order.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                      <label className="flex h-9 min-w-0 flex-1 items-center rounded-xl border border-[#d7e2f1] bg-white px-2 shadow-sm focus-within:ring-2 focus-within:ring-[#2954C8]/20">
+                        <select
+                          value={order.status}
+                          disabled={updatingOrderId === order.id || !order.merchant_can_update_status}
+                          onChange={(event) => handleStatusChange(order.id, event.target.value)}
+                          className="w-full bg-transparent text-[11px] font-bold text-slate-700 outline-none cursor-pointer disabled:cursor-not-allowed disabled:text-slate-400"
+                        >
+                          {ORDER_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {statusLabel(status)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    {updatingOrderId === order.id && <p className="mt-1.5 animate-pulse text-center text-[9px] font-medium text-[#2954C8]">Updating...</p>}
+                    {!order.merchant_can_update_status && (
+                      <p className="mt-1.5 text-center text-[9px] font-medium text-amber-600">Status locked.</p>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
           <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>

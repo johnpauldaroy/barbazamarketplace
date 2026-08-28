@@ -224,15 +224,15 @@ const MerchantProductsPage = () => {
   return (
     <div className="space-y-6">
       <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold text-slate-800">My Products</CardTitle>
+        <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="text-lg font-bold text-slate-800 sm:text-xl">My Products</CardTitle>
             <p className="text-sm text-slate-500">View products in your store. Product management is currently restricted to administrators.</p>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex gap-4">
-            <div className="relative flex-1 min-w-[300px]">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="Search products by name or category..."
@@ -243,7 +243,7 @@ const MerchantProductsPage = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm">
+          <div className="hidden overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm lg:block">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
@@ -299,12 +299,51 @@ const MerchantProductsPage = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile: stacked product cards in place of the table */}
+          <div className="space-y-3 lg:hidden">
+            {isLoadingProducts ? (
+              <p className="animate-pulse py-10 text-center text-sm text-slate-400">Loading catalog...</p>
+            ) : pagedProducts.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-500">No products found.</p>
+            ) : (
+              pagedProducts.map((product) => (
+                <div key={product.id} className="flex gap-3 rounded-2xl border border-[#ECF1FA] bg-white p-3 shadow-sm">
+                  <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-slate-100 p-1">
+                    {product.displayImage ? (
+                      <img src={product.displayImage} alt={product.displayName} className="h-full w-full rounded-md object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-md bg-slate-200 text-[8px] text-slate-400">
+                        No img
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">{product.displayName}</p>
+                        <p className="text-[10px] text-slate-400">ID: {product.id}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold text-slate-800">{defaultFormatPeso(product.displayAmount)}</p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {product.displayCategory}
+                      </Badge>
+                      <span className="text-xs font-medium text-slate-600">{product.displayStock} in stock</span>
+                      <span className="text-[10px] font-medium italic text-slate-400">View Only</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
           <Pagination currentPage={safePage} lastPage={lastPage} hasMore={safePage < lastPage} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
             <DialogDescription>

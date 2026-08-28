@@ -85,17 +85,17 @@ const MerchantInquiriesPage = () => {
   return (
     <div className="space-y-6">
       <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold text-slate-800">Seller Inquiries</CardTitle>
+        <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="text-lg font-bold text-slate-800 sm:text-xl">Seller Inquiries</CardTitle>
             <p className="text-sm text-slate-500">Manage customer inquiries submitted from your store page.</p>
           </div>
-          <label className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm">
+          <label className="flex w-full items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm sm:w-auto">
             <Filter className="mr-2 h-4 w-4 text-slate-400" />
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-10 bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+              className="h-10 w-full bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer sm:w-auto"
             >
               <option value="open">Open</option>
               <option value="resolved">Resolved</option>
@@ -104,7 +104,7 @@ const MerchantInquiriesPage = () => {
           </label>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm">
+          <div className="hidden overflow-hidden rounded-2xl border border-[#ECF1FA] bg-white shadow-sm lg:block">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#ECF1FA] bg-slate-50/50">
@@ -174,6 +174,57 @@ const MerchantInquiriesPage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: stacked inquiry cards in place of the table */}
+          <div className="space-y-3 lg:hidden">
+            {loading ? (
+              <p className="py-12 text-center text-sm text-slate-500">Loading inquiries...</p>
+            ) : inquiries.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-500">No inquiries found for this filter.</p>
+            ) : (
+              inquiries.map((inquiry) => (
+                <div key={inquiry.id} className="rounded-2xl border border-[#ECF1FA] bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800">#{inquiry.id}</p>
+                      <p className="text-[10px] text-slate-400">{formatDateTime(inquiry.created_at)}</p>
+                    </div>
+                    <Badge variant={inquiry.status === 'resolved' ? 'success' : 'warning'} className="shrink-0">
+                      {statusLabel(inquiry.status)}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <p className="truncate text-xs font-bold text-slate-700">{inquiry.name}</p>
+                    <p className="truncate text-[11px] text-slate-500">{inquiry.email}</p>
+                    <p className="text-[11px] text-slate-400">{inquiry.phone || 'No phone'}</p>
+                  </div>
+
+                  <p className="mt-3 whitespace-pre-line break-words text-xs text-slate-600">{inquiry.message}</p>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3 w-full gap-2"
+                    disabled={updatingId === inquiry.id}
+                    onClick={() =>
+                      handleStatusChange(
+                        inquiry.id,
+                        inquiry.status === 'resolved' ? 'open' : 'resolved'
+                      )
+                    }
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    {updatingId === inquiry.id
+                      ? 'Updating...'
+                      : inquiry.status === 'resolved'
+                        ? 'Reopen'
+                        : 'Resolve'}
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

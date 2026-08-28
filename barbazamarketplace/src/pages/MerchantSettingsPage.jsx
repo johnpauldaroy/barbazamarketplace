@@ -202,7 +202,7 @@ const MerchantSettingsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Merchant Settings</h2>
+        <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">Merchant Settings</h2>
         <p className="text-sm text-slate-500">Manage your store profile and product categories.</p>
       </div>
 

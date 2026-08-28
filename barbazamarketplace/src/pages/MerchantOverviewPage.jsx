@@ -266,13 +266,13 @@ const MerchantOverviewPage = () => {
   }, [products]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Merchant Dashboard</h2>
+        <h2 className="text-xl font-bold text-slate-800 sm:text-2xl">Merchant Dashboard</h2>
         <p className="text-sm text-slate-500">Revenue, orders, inventory, and product performance in one view.</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-5">
         <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-slate-500">Store</CardTitle>
@@ -295,7 +295,7 @@ const MerchantOverviewPage = () => {
           <CardContent>
             <div className="flex items-center gap-2">
               <Boxes className="h-5 w-5 text-[#2954C8]" />
-              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : products.length}</p>
+              <p className="text-2xl font-bold text-slate-800 sm:text-3xl">{loading ? '--' : products.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -305,7 +305,7 @@ const MerchantOverviewPage = () => {
             <CardTitle className="text-sm font-semibold text-slate-500">Inventory Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-slate-800">{loading ? '--' : formatPeso(inventoryValue)}</p>
+            <p className="text-2xl font-bold text-slate-800 sm:text-3xl">{loading ? '--' : formatPeso(inventoryValue)}</p>
           </CardContent>
         </Card>
 
@@ -316,7 +316,7 @@ const MerchantOverviewPage = () => {
           <CardContent>
             <div className="flex items-center gap-2">
               <Wallet className="h-5 w-5 text-[#2954C8]" />
-              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : formatPeso(grossRevenue)}</p>
+              <p className="text-2xl font-bold text-slate-800 sm:text-3xl">{loading ? '--' : formatPeso(grossRevenue)}</p>
             </div>
           </CardContent>
         </Card>
@@ -328,7 +328,7 @@ const MerchantOverviewPage = () => {
           <CardContent>
             <div className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-[#2954C8]" />
-              <p className="text-3xl font-bold text-slate-800">{loading ? '--' : orders.length}</p>
+              <p className="text-2xl font-bold text-slate-800 sm:text-3xl">{loading ? '--' : orders.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -345,13 +345,13 @@ const MerchantOverviewPage = () => {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[1.45fr_1fr]">
         <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-800">Revenue and Orders (Last 6 Months)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
+            <div className="h-[240px] w-full sm:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyPerformance}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
@@ -412,7 +412,7 @@ const MerchantOverviewPage = () => {
               <p className="py-20 text-center text-sm text-slate-500">No orders yet.</p>
             ) : (
               <>
-                <div className="h-[240px] w-full">
+                <div className="h-[220px] w-full sm:h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -448,7 +448,7 @@ const MerchantOverviewPage = () => {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-2">
         <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-slate-800">Top Products by Revenue</CardTitle>
@@ -457,7 +457,7 @@ const MerchantOverviewPage = () => {
             {topProductsByRevenue.length === 0 ? (
               <p className="py-16 text-center text-sm text-slate-500">No product sales yet.</p>
             ) : (
-              <div className="h-[300px] w-full">
+              <div className="h-[240px] w-full sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topProductsByRevenue} layout="vertical" margin={{ top: 4, right: 14, left: 8, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
@@ -468,7 +468,7 @@ const MerchantOverviewPage = () => {
                       tick={{ fontSize: 11, fill: '#64748B' }}
                       tickFormatter={(value) => `${Math.round(Number(value || 0) / 1000)}k`}
                     />
-                    <YAxis type="category" dataKey="label" width={128} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                    <YAxis type="category" dataKey="label" width={92} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
                     <RechartsTooltip
                       contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0' }}
                       formatter={(value, name, context) => {
@@ -492,7 +492,7 @@ const MerchantOverviewPage = () => {
             {inventoryByCategory.length === 0 ? (
               <p className="py-16 text-center text-sm text-slate-500">No inventory data available.</p>
             ) : (
-              <div className="h-[300px] w-full">
+              <div className="h-[240px] w-full sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={inventoryByCategory}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
