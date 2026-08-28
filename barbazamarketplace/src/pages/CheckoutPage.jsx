@@ -22,7 +22,13 @@ const CheckoutPage = () => {
   const [selectedMethods, setSelectedMethods] = useState({});
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', address: '', city: '' });
 
-  const orderItems = useMemo(() => cartItems.map((item) => ({ product_id: item.product.id, quantity: item.quantity })), [cartItems]);
+  // A null product_variant_id (a cart saved before variants shipped) is sent as
+  // undefined so the server applies the product's default variant.
+  const orderItems = useMemo(() => cartItems.map((item) => ({
+    product_id: item.product.id,
+    product_variant_id: item.variant?.product_variant_id ?? undefined,
+    quantity: item.quantity,
+  })), [cartItems]);
 
   useEffect(() => {
     if (!user) return;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Store;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class ProductController extends Controller
         $sort = $validated['sort'] ?? 'name';
 
         $products = $this->applyVisibleReviewSummary(
-            Product::query()->with('store')
+            Product::query()->with(['store', 'variants', 'baseUnit'])
         )
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nestedQuery) use ($search) {
@@ -83,7 +84,7 @@ class ProductController extends Controller
     public function show($id)
     {
         $product = $this->applyVisibleReviewSummary(
-            Product::query()->with('store')
+            Product::query()->with(['store', 'variants', 'baseUnit'])
         )->findOrFail($id);
 
         return response()->json([
@@ -489,10 +490,19 @@ class ProductController extends Controller
             'category_slug' => Str::slug($product->category ?? 'general'),
             'image' => $product->image,
             'image_url' => $product->image_url,
-            'stock' => (int) $product->stock,
+            // Stock counts base units and may be fractional for weight/volume.
+            'stock' => (float) $product->stock,
+            'base_unit' => $product->baseUnit ? [
+                'id' => $product->baseUnit->id,
+                'code' => $product->baseUnit->code,
+                'label' => $product->baseUnit->label,
+                'is_fractional' => (bool) $product->baseUnit->is_fractional,
+            ] : null,
+            'has_variants' => (bool) $product->has_variants,
+            'variants' => $this->formatVariants($product),
             'low_stock_threshold' => (int) $product->low_stock_threshold,
             'is_low_stock' => $product->isLowStock(),
-            'is_in_stock' => (int) $product->stock > 0,
+            'is_in_stock' => (float) $product->stock > 0,
             'review_summary' => [
                 'average_rating' => round((float) ($product->visible_reviews_average_rating ?? 0), 2),
                 'ratings_count' => (int) ($product->visible_reviews_count ?? 0),
@@ -500,5 +510,38 @@ class ProductController extends Controller
             'created_at' => optional($product->created_at)->toISOString(),
             'updated_at' => optional($product->updated_at)->toISOString(),
         ];
+    }
+
+    /**
+     * Active variants with their own price and how many of each the shared base
+     * stock can currently cover.
+     */
+    protected function formatVariants(Product $product): array
+    {
+        $variants = $product->relationLoaded('variants')
+            ? $product->variants
+            : $product->variants()->get();
+
+        $defaultId = optional($product->defaultVariant())->id;
+
+        return $variants
+            ->where('is_active', true)
+            ->map(function (ProductVariant $variant) use ($product, $defaultId) {
+                $variant->setRelation('product', $product);
+                $available = $variant->availableQuantity();
+
+                return [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'sku' => $variant->sku,
+                    'base_unit_quantity' => (float) $variant->base_unit_quantity,
+                    'price' => (float) $variant->price,
+                    'is_default' => $variant->id === $defaultId,
+                    'available_quantity' => $available,
+                    'is_in_stock' => $available > 0,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

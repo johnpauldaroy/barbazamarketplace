@@ -11,6 +11,7 @@ use App\Http\Controllers\MerchantStoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PaymentSubmissionController;
 use App\Http\Controllers\PublicStoreController;
@@ -47,6 +48,7 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/products/{id}/reviews', [ProductReviewController::class, 'index']);
 Route::get('/categories', [ProductController::class, 'categories']);
+Route::get('/units', [ProductVariantController::class, 'units']);
 Route::get('/stores', [PublicStoreController::class, 'index']);
 Route::get('/stores/{slug}', [PublicStoreController::class, 'show']);
 Route::post('/stores/{slug}/inquiries', [StoreInquiryController::class, 'store'])->middleware('throttle:8,1');
@@ -97,6 +99,14 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/admin/reviews/{id}/visibility', [AdminReviewController::class, 'updateVisibility']);
             Route::patch('/admin/review-reports/{id}', [AdminReviewController::class, 'updateReport']);
         });
+
+        // Variant management: merchants are scoped to their own store inside the
+        // controller, admins may manage any product. Kept out of the 'merchant'
+        // group because that middleware rejects admins.
+        Route::get('/products/{productId}/variants', [ProductVariantController::class, 'index']);
+        Route::post('/products/{productId}/variants', [ProductVariantController::class, 'store']);
+        Route::put('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'update']);
+        Route::delete('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'destroy']);
 
         Route::middleware('merchant')->group(function () {
             Route::get('/merchant/store', [MerchantStoreController::class, 'show']);

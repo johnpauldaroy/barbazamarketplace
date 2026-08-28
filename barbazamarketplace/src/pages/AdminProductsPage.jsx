@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import { useToast } from '../components/ui/use-toast';
 import { bulkImportProducts, createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
@@ -523,7 +524,7 @@ const AdminProductsPage = () => {
       </Card>
 
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
             <DialogDescription>
@@ -659,6 +660,15 @@ const AdminProductsPage = () => {
                 onChange={(event) => updateFormField('imageFile', event.target.files?.[0] || null)}
               />
             </div>
+
+            {/* Variants only make sense once the product exists and has an id. */}
+            {editingProduct?.id && (
+              <ProductVariantsEditor
+                productId={editingProduct.id}
+                baseUnitCode={editingProduct.base_unit?.code || 'pc'}
+                stock={editingProduct.stock}
+              />
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFormDialogOpen(false)} disabled={isMutating}>

@@ -8,6 +8,7 @@ use App\Models\OrderFeedbackLink;
 use App\Models\OrderGroup;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\StorePaymentMethod;
 use App\Models\User;
@@ -634,6 +635,7 @@ class OrderController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|integer|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'nullable|numeric',
             'subtotal_amount' => 'nullable|numeric|min:0',
@@ -676,7 +678,10 @@ class OrderController extends Controller
                 ?? null;
             $itemsPayload = collect($request->items);
             $products = Product::lockForUpdate()
-                ->with(['store.paymentMethods' => fn ($query) => $query->where('is_enabled', true)])
+                ->with([
+                    'store.paymentMethods' => fn ($query) => $query->where('is_enabled', true),
+                    'variants',
+                ])
                 ->whereIn('id', $itemsPayload->pluck('product_id')->all())
                 ->get()
                 ->keyBy('id');
@@ -748,21 +753,40 @@ class OrderController extends Controller
                 foreach ($storeItems as $item) {
                     $product = $products->get($item['product_id']);
                     $requestedQty = (int) $item['quantity'];
-                    if ((float) $product->stock < $requestedQty) {
+                    $variant = $this->resolveCheckoutVariant($product, $item['product_variant_id'] ?? null);
+
+                    // Stock is held in base units, so a variant that packages several
+                    // of them (a sack, a 5kg pack) draws the shared pool down by its
+                    // own multiple rather than by one per item sold.
+                    $baseUnitsNeeded = $variant
+                        ? $variant->baseUnitsFor($requestedQty)
+                        : (float) $requestedQty;
+
+                    if ((float) $product->stock < $baseUnitsNeeded) {
+                        $label = $variant && $product->has_variants
+                            ? "{$product->title} ({$variant->name})"
+                            : $product->title;
+
                         throw ValidationException::withMessages([
-                            'items' => ["Insufficient stock for {$product->title}."],
+                            'items' => ["Insufficient stock for {$label}."],
                         ]);
                     }
 
-                    $product->stock = (float) $product->stock - $requestedQty;
+                    $product->stock = round((float) $product->stock - $baseUnitsNeeded, 3);
                     $product->save();
-                    $unitPrice = round((float) $product->price, 2);
+
+                    // Price is always taken from the server side, never the payload.
+                    $unitPrice = round((float) ($variant->price ?? $product->price), 2);
                     $subtotalAmount += $unitPrice * $requestedQty;
 
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $variant?->id,
+                        // Snapshot the name so receipts survive a later rename.
+                        'variant_name' => $variant?->name,
                         'quantity' => $requestedQty,
+                        'base_units_deducted' => $baseUnitsNeeded,
                         'price' => $unitPrice,
                     ]);
                 }
@@ -981,6 +1005,46 @@ class OrderController extends Controller
         ];
     }
 
+    /**
+     * Resolve the variant a checkout line refers to.
+     *
+     * A missing id falls back to the product's default variant, so carts saved
+     * before variants shipped still check out. An id belonging to a different
+     * product, or an inactive variant, is rejected rather than silently ignored.
+     */
+    protected function resolveCheckoutVariant(Product $product, $variantId): ?ProductVariant
+    {
+        $variants = $product->relationLoaded('variants')
+            ? $product->variants
+            : $product->variants()->get();
+
+        if ($variantId === null || $variantId === '') {
+            return $product->defaultVariant();
+        }
+
+        $variant = $variants->firstWhere('id', (int) $variantId);
+
+        if (! $variant) {
+            throw ValidationException::withMessages([
+                'items' => ["The selected option is not available for {$product->title}."],
+            ]);
+        }
+
+        if (! $variant->is_active) {
+            throw ValidationException::withMessages([
+                'items' => ["{$product->title} ({$variant->name}) is no longer available."],
+            ]);
+        }
+
+        if ((float) $variant->base_unit_quantity <= 0) {
+            throw ValidationException::withMessages([
+                'items' => ["{$product->title} ({$variant->name}) is not configured for sale."],
+            ]);
+        }
+
+        return $variant;
+    }
+
     protected function isInventoryRestored(?string $status): bool
     {
         return in_array(strtolower((string) $status), ['cancelled', 'refunded'], true);
@@ -992,7 +1056,9 @@ class OrderController extends Controller
 
         foreach ($order->items as $item) {
             if ($item->product) {
-                $item->product->increment('stock', $item->quantity);
+                // Return the base units this line consumed, not the item count:
+                // cancelling one 25kg sack must put back 25, not 1.
+                $item->product->increment('stock', $item->baseUnitsDeducted());
             }
         }
     }
@@ -1008,13 +1074,15 @@ class OrderController extends Controller
                 continue;
             }
 
-            if ($product->stock < $item->quantity) {
+            $baseUnits = $item->baseUnitsDeducted();
+
+            if ((float) $product->stock < $baseUnits) {
                 throw ValidationException::withMessages([
                     'status' => ["Unable to move order #{$order->id} back to an active state because {$product->title} does not have enough stock."],
                 ]);
             }
 
-            $product->decrement('stock', $item->quantity);
+            $product->decrement('stock', $baseUnits);
         }
     }
 }

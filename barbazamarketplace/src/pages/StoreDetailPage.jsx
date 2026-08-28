@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Filter,
   Loader2,
@@ -21,7 +21,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
-import { buildSimpleCartItem } from '../lib/marketplace';
+import { buildCartItem, hasMultipleVariants } from '../lib/marketplace';
 
 const STORE_PRODUCTS_PAGE_SIZE = 24;
 const STORE_SORT_OPTIONS = [
@@ -48,6 +48,7 @@ const StoreDetailPage = () => {
   const { slug } = useParams();
   const { user, isAuthenticated } = useAuth();
   const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
@@ -180,7 +181,13 @@ const StoreDetailPage = () => {
   const addressLabel = useMemo(() => buildAddress(store), [store]);
 
   const handleQuickAdd = (product) => {
-    const { product: cartProduct, variant } = buildSimpleCartItem(product);
+    // More than one option means the shopper must choose a unit first.
+    if (hasMultipleVariants(product)) {
+      navigate(`/product/${product.id}`);
+      return;
+    }
+
+    const { product: cartProduct, variant } = buildCartItem(product);
     addToCart(cartProduct, variant, 1, variant.inventory_quantity).catch((cartError) => {
       console.error(cartError);
     });

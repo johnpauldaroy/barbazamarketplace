@@ -786,3 +786,49 @@ export const updateMerchantInquiryStatus = async (id, status) => {
         throw error;
     }
 };
+
+// Product variant + unit APIs
+export const fetchUnits = async () => {
+    const data = await apiRequest('/units');
+    return data?.units || [];
+};
+
+export const fetchProductVariants = async (productId) => {
+    const data = await apiRequest(`/products/${productId}/variants`);
+    return data?.variants || [];
+};
+
+export const createProductVariant = async (productId, payload) => {
+    try {
+        return await apiRequest(`/products/${productId}/variants`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Create product variant error:', error);
+        throw error;
+    }
+};
+
+export const updateProductVariant = async (productId, variantId, payload) => {
+    try {
+        return await apiRequest(`/products/${productId}/variants/${variantId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Update product variant error:', error);
+        throw error;
+    }
+};
+
+export const deleteProductVariant = async (productId, variantId) => {
+    try {
+        return await apiRequest(`/products/${productId}/variants/${variantId}`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        console.error('Delete product variant error:', error);
+        throw error;
+    }
+};

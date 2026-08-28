@@ -10,11 +10,11 @@ import {
   Tag,
   X,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchProducts, fetchStores } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../hooks/useCart';
-import { buildSimpleCartItem } from '../lib/marketplace';
+import { buildCartItem, hasMultipleVariants } from '../lib/marketplace';
 import { cn } from '../lib/utils';
 
 const PAGE_SIZE = 12;
@@ -32,6 +32,7 @@ const resolveStoreLocation = (store) =>
 
 const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('newest');
@@ -150,7 +151,13 @@ const ProductsPage = () => {
   }, [products, selectedLocation]);
 
   const handleQuickAdd = (product) => {
-    const { product: p, variant } = buildSimpleCartItem(product);
+    // More than one option means the shopper must choose a unit first.
+    if (hasMultipleVariants(product)) {
+      navigate(`/product/${product.id}`);
+      return;
+    }
+
+    const { product: p, variant } = buildCartItem(product);
     addToCart(p, variant, 1, variant.inventory_quantity).catch(console.error);
   };
 

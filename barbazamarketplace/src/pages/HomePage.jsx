@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   CircleDollarSign,
@@ -14,7 +14,7 @@ import {
 import { fetchProducts, fetchStores } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../hooks/useCart';
-import { buildSimpleCartItem } from '../lib/marketplace';
+import { buildCartItem, hasMultipleVariants } from '../lib/marketplace';
 
 const CATEGORIES = [
   { label: 'Fresh Produce', icon: Leaf, color: 'bg-green-50 text-green-700', border: 'border-green-100' },
@@ -51,6 +51,7 @@ const HomePage = () => {
   const [loading, setLoading] = useState(false);
   const [locations, setLocations] = useState([]);
   const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
@@ -84,7 +85,13 @@ const HomePage = () => {
   }, []);
 
   const handleQuickAdd = (product) => {
-    const { product: p, variant } = buildSimpleCartItem(product);
+    // More than one option means the shopper must choose a unit first.
+    if (hasMultipleVariants(product)) {
+      navigate(`/product/${product.id}`);
+      return;
+    }
+
+    const { product: p, variant } = buildCartItem(product);
     addToCart(p, variant, 1, variant.inventory_quantity).catch(console.error);
   };
 

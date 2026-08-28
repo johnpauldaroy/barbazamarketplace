@@ -5,13 +5,41 @@ const CartContext = createContext();
 
 const CART_STORAGE_KEY = 'barbaza-mpc-cart';
 
+/**
+ * Carts saved before variants shipped stored a synthesised variant whose id was
+ * the product id, so those ids do not exist in product_variants. Rather than
+ * letting them reach checkout and fail, mark them as having no variant: the
+ * server then falls back to each product's default variant.
+ *
+ * A line is recognised as pre-variant when it carries no product_variant_id key
+ * at all — lines written by the current code always set it, even to null.
+ */
+const migrateStoredCart = (items) => {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter((item) => item && item.product && item.variant)
+    .map((item) => {
+      if ('product_variant_id' in item.variant) return item;
+
+      return {
+        ...item,
+        variant: {
+          ...item.variant,
+          // Keep the original id as the cart key so quantities stay merged.
+          product_variant_id: null,
+        },
+      };
+    });
+};
+
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState(() => {
     try {
       const storedCart = localStorage.getItem(CART_STORAGE_KEY);
-      return storedCart ? JSON.parse(storedCart) : [];
+      return storedCart ? migrateStoredCart(JSON.parse(storedCart)) : [];
     } catch (error) {
       return [];
     }

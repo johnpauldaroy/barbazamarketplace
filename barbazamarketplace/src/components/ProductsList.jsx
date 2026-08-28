@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchProducts } from '../api/EcommerceApi';
 import { useCart } from '../hooks/useCart';
-import { buildSimpleCartItem, resolveProductImage } from '../lib/marketplace';
+import { buildCartItem, resolveProductImage } from '../lib/marketplace';
 
 const ProductsList = () => {
   const [products, setProducts] = useState([]);
@@ -42,9 +42,9 @@ const ProductsList = () => {
   const handleQuickAdd = (e, product) => {
     e.preventDefault();
     e.stopPropagation();
-    const { product: cartProduct, variant } = buildSimpleCartItem(product);
+    const { product: cartProduct, variant } = buildCartItem(product);
 
-    addToCart(cartProduct, variant, 1, product.stock)
+    addToCart(cartProduct, variant, 1, variant.inventory_quantity)
       .catch(err => console.error(err));
   };
 

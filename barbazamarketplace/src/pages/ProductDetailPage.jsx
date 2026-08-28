@@ -23,7 +23,7 @@ import {
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/use-toast';
-import { buildSimpleCartItem, resolveProductImage } from '../lib/marketplace';
+import { buildCartItem, getAvailableQuantity, getDefaultVariant, getProductVariants, resolveProductImage } from '../lib/marketplace';
 
 const defaultSummary = { average_rating: 0, ratings_count: 0, breakdown: [] };
 
@@ -67,6 +67,7 @@ const ProductDetailPage = () => {
 
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addedToCart, setAddedToCart] = useState(false);
@@ -143,6 +144,26 @@ const ProductDetailPage = () => {
   useEffect(() => { loadReviews(); }, [loadReviews]);
   useEffect(() => { loadMyReview(); }, [loadMyReview, user?.id]);
 
+  const variants = useMemo(
+    () => getProductVariants(product).filter((variant) => variant.is_active !== false),
+    [product]
+  );
+
+  const selectedVariant = useMemo(() => {
+    if (!product) return null;
+    return variants.find((variant) => variant.id === selectedVariantId) || getDefaultVariant(product);
+  }, [product, variants, selectedVariantId]);
+
+  const availableQuantity = useMemo(
+    () => getAvailableQuantity(product, selectedVariant),
+    [product, selectedVariant]
+  );
+
+  // Switching unit changes how many are purchasable, so clamp the quantity.
+  useEffect(() => {
+    setQuantity((current) => Math.min(Math.max(1, current), Math.max(1, availableQuantity)));
+  }, [availableQuantity]);
+
   const summaryRating = useMemo(() => Number(reviewSummary?.average_rating || product?.review_summary?.average_rating || 0), [reviewSummary, product]);
   const summaryCount  = useMemo(() => Number(reviewSummary?.ratings_count  || product?.review_summary?.ratings_count  || 0), [reviewSummary, product]);
 
@@ -150,8 +171,8 @@ const ProductDetailPage = () => {
     if (!product) return;
     setAddingToCart(true);
     try {
-      const { product: cp, variant } = buildSimpleCartItem(product);
-      await addToCart(cp, variant, quantity, Number(product.stock || 0));
+      const { product: cp, variant } = buildCartItem(product, selectedVariant);
+      await addToCart(cp, variant, quantity, availableQuantity);
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 2500);
     } catch (e) {
@@ -238,7 +259,8 @@ const ProductDetailPage = () => {
     );
   }
 
-  const stock = Number(product.stock || 0);
+  // What the shopper can actually buy of the selected unit.
+  const stock = availableQuantity;
   const imageUrl = resolveProductImage(product.image_url || product.image);
 
   return (
@@ -351,12 +373,52 @@ const ProductDetailPage = () => {
             {/* Price */}
             <div className="rounded-xl border border-[#dfe7f4] bg-white p-5">
               <p className="text-3xl font-extrabold text-[#0b1739]">
-                PHP {Number(product.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                PHP {Number(selectedVariant?.price ?? product.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
               <p className={`mt-1.5 text-sm font-medium ${stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
                 {stock > 0 ? `In stock · ${stock} available` : 'Out of stock'}
               </p>
             </div>
+
+            {/* Unit / packaging picker */}
+            {variants.length > 1 && (
+              <div>
+                <p className="mb-2 text-sm font-semibold text-[#0b1739]">Choose an option</p>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((variant) => {
+                    const isSelected = selectedVariant?.id === variant.id;
+                    const soldOut = Number(variant.available_quantity || 0) <= 0;
+
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() => setSelectedVariantId(variant.id)}
+                        disabled={soldOut}
+                        aria-pressed={isSelected}
+                        className={`rounded-lg border px-4 py-2.5 text-left transition ${
+                          isSelected
+                            ? 'border-[#2954C8] bg-[#eef3fb] ring-1 ring-[#2954C8]'
+                            : 'border-[#dfe7f4] bg-white hover:border-[#2954C8]'
+                        } ${soldOut ? 'cursor-not-allowed opacity-50' : ''}`}
+                      >
+                        <span className="block text-sm font-semibold text-[#0b1739]">{variant.name}</span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {soldOut
+                            ? 'Sold out'
+                            : `PHP ${Number(variant.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedVariant && product.base_unit && Number(selectedVariant.base_unit_quantity) !== 1 && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    1 {selectedVariant.name} = {Number(selectedVariant.base_unit_quantity)} {product.base_unit.code}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             {product.description && (

@@ -101,12 +101,12 @@ const getStepState = (currentStatus, stepIndex) => {
 
 const getJourneyProgressPercent = (status) => {
   const normalizedStatus = String(status || 'pending').toLowerCase();
-  if (TERMINAL_STATUSES.includes(normalizedStatus)) return 100;
+  if (TERMINAL_STATUSES.includes(normalizedStatus)) return 0;
 
   const currentIndex = ORDER_JOURNEY_STEPS.indexOf(normalizedStatus);
-  if (currentIndex === -1) return 25;
+  if (currentIndex <= 0) return 0;
 
-  return ((currentIndex + 1) / ORDER_JOURNEY_STEPS.length) * 100;
+  return (currentIndex / (ORDER_JOURNEY_STEPS.length - 1)) * 100;
 };
 
 const formatDateTime = (value) => {
@@ -415,11 +415,11 @@ const AccountPage = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border-none bg-white/80 shadow-lg">
+              <Card className="rounded-2xl border-none bg-white/80 shadow-lg sm:rounded-[28px]">
                 <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                   <CardTitle className="text-xl">Order Details</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                   {!selectedOrder ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
                       Select an order to view details.
@@ -434,63 +434,56 @@ const AccountPage = () => {
                         const progress = getJourneyProgressPercent(normalizedStatus);
 
                         return (
-                          <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-3 sm:p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Order Journey</p>
-                              <div className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusVariantClass(normalizedStatus)}`}>
+                          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white sm:rounded-2xl">
+                            <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 px-4 py-3.5 sm:px-5">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Order journey</p>
+                                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{statusMeta.detail}</p>
+                              </div>
+                              <div className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider ${statusVariantClass(normalizedStatus)}`}>
                                 <StatusIcon className="h-3.5 w-3.5" />
                                 {statusMeta.label}
                               </div>
                             </div>
 
-                            <p className="mt-2 text-sm text-slate-600">{statusMeta.detail}</p>
-
-                            <div className="mt-4 h-2 rounded-full bg-slate-200">
-                              <div
-                                className={`h-2 rounded-full transition-all duration-300 ${isTerminalStatus ? 'bg-rose-500' : 'bg-[#2954C8]'}`}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-1 gap-2 min-[520px]:grid-cols-2">
+                            <div className="px-2 pb-4 pt-5 sm:px-5 sm:pb-5 sm:pt-6">
+                              <div className="relative">
+                                <div className="absolute left-[12.5%] right-[12.5%] top-[17px] h-1 rounded-full bg-slate-200" aria-hidden="true">
+                                  <div
+                                    className={`h-full rounded-full transition-[width] duration-500 ${isTerminalStatus ? 'bg-rose-500' : 'bg-[#2954C8]'}`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                                <div className="relative grid grid-cols-4 gap-1">
                               {ORDER_JOURNEY_STEPS.map((step, index) => {
                                 const stepMeta = STATUS_META[step];
                                 const StepIcon = stepMeta.icon;
                                 const stepState = getStepState(normalizedStatus, index);
 
-                                const stateClass =
-                                  stepState === 'complete'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : stepState === 'current'
-                                      ? 'border-[#2954C8]/35 bg-[#eef5ff] text-[#2954C8]'
-                                      : 'border-slate-200 bg-white text-slate-500';
-
                                 return (
-                                  <div key={step} className={`min-w-0 rounded-xl border p-2.5 ${stateClass}`}>
-                                    <div className="flex items-start gap-2">
-                                      <div
-                                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
+                                  <div key={step} className="min-w-0 text-center">
+                                    <div
+                                      className={`relative z-10 mx-auto inline-flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white shadow-sm ${
                                           stepState === 'complete'
                                             ? 'bg-emerald-600 text-white'
                                             : stepState === 'current'
                                               ? 'bg-[#2954C8] text-white'
-                                              : 'bg-slate-100 text-slate-500'
-                                        }`}
-                                      >
-                                        <StepIcon className="h-4 w-4" />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="break-words text-[11px] font-semibold uppercase leading-tight">{stepMeta.label}</p>
-                                        <p className="mt-0.5 break-words text-[11px] leading-tight opacity-80">{stepMeta.subtitle}</p>
-                                      </div>
+                                              : 'bg-slate-100 text-slate-400'
+                                      }`}
+                                    >
+                                      <StepIcon className="h-4 w-4" />
                                     </div>
+                                    <p className={`mt-2 truncate px-0.5 text-[9px] font-bold uppercase leading-tight tracking-tight min-[390px]:text-[10px] ${stepState === 'complete' ? 'text-emerald-700' : stepState === 'current' ? 'text-[#2954C8]' : 'text-slate-400'}`}>{stepMeta.label}</p>
+                                    <p className="mt-1 hidden truncate px-1 text-[10px] leading-tight text-slate-400 min-[430px]:block">{stepMeta.subtitle}</p>
                                   </div>
                                 );
                               })}
+                                </div>
+                              </div>
                             </div>
 
                             {isTerminalStatus && (
-                              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                              <div className="border-t border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:px-5">
                                 This order has reached a closed status: <span className="font-semibold">{statusMeta.label}</span>.
                               </div>
                             )}
@@ -579,8 +572,14 @@ const AccountPage = () => {
                             </div>
                           </div>
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <Input value={paymentProofForm.referenceNumber} onChange={(event) => setPaymentProofForm((current) => ({ ...current, referenceNumber: event.target.value }))} placeholder="Transaction reference" className="min-h-11 bg-white text-base" />
-                            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPaymentProofForm((current) => ({ ...current, proof: event.target.files?.[0] || null }))} className="min-h-11 rounded-lg border border-slate-200 bg-white p-2 text-sm" />
+                            <label className="text-sm font-semibold text-slate-700">
+                              Transaction reference <span className="text-red-600" aria-hidden="true">*</span>
+                              <Input required aria-required="true" value={paymentProofForm.referenceNumber} onChange={(event) => setPaymentProofForm((current) => ({ ...current, referenceNumber: event.target.value }))} placeholder="Required reference number" className="mt-1.5 min-h-11 bg-white text-base" />
+                            </label>
+                            <label className="text-sm font-semibold text-slate-700">
+                              Payment proof <span className="text-red-600" aria-hidden="true">*</span>
+                              <input required type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPaymentProofForm((current) => ({ ...current, proof: event.target.files?.[0] || null }))} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm" />
+                            </label>
                           </div>
                           <Button type="submit" disabled={submittingPaymentOrderId === selectedOrder.id} className="mt-3 min-h-11 gap-2 bg-[#2954C8]"><Upload className="h-4 w-4" />{submittingPaymentOrderId === selectedOrder.id ? 'Submitting…' : 'Submit proof for review'}</Button>
                         </form>
