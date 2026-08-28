@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { Helmet } from 'react-helmet';
-import { ChevronRight, ImageIcon, Minus, Package, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { ChevronRight, Minus, Package, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../hooks/useCart';
+import ProductThumbnail from '../components/ProductThumbnail';
 
 const fmt = (cents) =>
   `PHP ${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -79,19 +80,11 @@ const CartPage = () => {
                   >
                     <div className="flex gap-4">
                       {/* Image */}
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[#dfe7f4] bg-[#f4f7fd]">
-                        {item.product.thumbnail_url ? (
-                          <img
-                            src={item.product.thumbnail_url}
-                            alt={item.product.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-slate-300">
-                            <ImageIcon className="h-6 w-6" />
-                          </div>
-                        )}
-                      </div>
+                      <ProductThumbnail
+                        src={item.product.thumbnail_url}
+                        alt={item.product.title}
+                        className="h-20 w-20"
+                      />
 
                       <div className="flex flex-1 flex-col gap-1 min-w-0">
                         <p className="clamp-2 text-sm font-semibold text-[#0b1739]">{item.product.title}</p>

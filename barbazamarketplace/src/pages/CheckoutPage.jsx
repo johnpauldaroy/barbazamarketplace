@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { AlertCircle, ArrowLeft, Banknote, ChevronRight, ImageIcon, Landmark, Loader2, QrCode, ShieldCheck, Smartphone, Store } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Banknote, ChevronRight, Landmark, Loader2, QrCode, ShieldCheck, Smartphone, Store } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/ui/use-toast';
 import { useCart } from '../hooks/useCart';
+import ProductThumbnail from '../components/ProductThumbnail';
 import { useAuth } from '../hooks/useAuth';
 import { createOrder, fetchCheckoutQuote } from '../api/EcommerceApi';
 import { formatPeso } from '../lib/marketplace';
@@ -120,7 +121,7 @@ const CheckoutPage = () => {
                 <div className="space-y-6">{quote.groups.map((group) => (
                   <div key={group.store_id} className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
                     <div className="mb-4 flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-[#2954C8]">Merchant order</p><h3 className="mt-1 font-bold text-[#0b1739]">{group.store_name}</h3></div><p className="font-bold text-[#0b1739]">{formatPeso(group.total_amount)}</p></div>
-                    <div className="mb-4 space-y-2 rounded-lg bg-[#f8fafd] p-3">{itemsForGroup(group).map((item) => <div key={item.variant.id} className="flex items-center gap-3 text-sm"><div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white">{item.product.thumbnail_url ? <img src={item.product.thumbnail_url} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-4 w-4 text-slate-300" />}</div><span className="min-w-0 flex-1 truncate text-slate-700">{item.product.title}</span><span className="text-slate-500">× {item.quantity}</span></div>)}</div>
+                    <div className="mb-4 space-y-2 rounded-lg bg-[#f8fafd] p-3">{itemsForGroup(group).map((item) => <div key={item.variant.id} className="flex items-center gap-3 text-sm"><ProductThumbnail src={item.product.thumbnail_url} alt={item.product.title} className="h-10 w-10 rounded-md bg-white" /><span className="min-w-0 flex-1 truncate text-slate-700">{item.product.title}</span><span className="text-slate-500">× {item.quantity}</span></div>)}</div>
                     {group.payment_methods.length === 0 ? <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><p>This merchant has no active payment method. Remove these items or contact the merchant.</p></div> : (
                       <div className="grid gap-2 sm:grid-cols-2">{group.payment_methods.map((method) => {
                         const Icon = METHOD_ICONS[method.type] || Banknote;

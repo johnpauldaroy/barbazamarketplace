@@ -21,7 +21,7 @@ export const resolveProductImage = (imagePath) => {
 const buildCartProduct = (product) => ({
   id: product.id,
   title: product.title || product.name,
-  thumbnail_url: resolveProductImage(product.image),
+  thumbnail_url: resolveProductImage(product.image_url || product.image),
   description: product.description,
   store_id: product.store_id || product.store?.id || null,
   store_name: product.store?.name || 'Store',

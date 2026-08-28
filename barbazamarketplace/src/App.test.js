@@ -20,3 +20,16 @@ test('builds a cart-ready product payload', () => {
   expect(item.variant.price_in_cents).toBe(27525);
   expect(item.variant.inventory_quantity).toBe(8);
 });
+
+test('prefers the API product image URL for cart thumbnails', () => {
+  const item = buildSimpleCartItem({
+    id: 43,
+    title: 'Pancit Fresh',
+    price: 100,
+    stock: 1,
+    image: 'products/legacy-path.jpg',
+    image_url: '/storage/products/current-path.jpg',
+  });
+
+  expect(item.product.thumbnail_url).toContain('/storage/products/current-path.jpg');
+});
