@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminStoreController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MerchantInquiryController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\MerchantProductController;
 use App\Http\Controllers\MerchantPaymentMethodController;
 use App\Http\Controllers\MerchantStoreController;
@@ -95,6 +96,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
             Route::put('/products/{id}', [ProductController::class, 'update']);
             Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+            Route::get('/products/{product}/inventory-movements', [InventoryController::class, 'movements']);
+            Route::post('/products/{product}/inventory-adjustments', [InventoryController::class, 'adjust']);
+            Route::post('/products/{product}/unit-conversion/preview', [InventoryController::class, 'previewConversion']);
+            Route::post('/products/{product}/unit-conversion', [InventoryController::class, 'convert']);
             Route::get('/admin/reviews', [AdminReviewController::class, 'index']);
             Route::patch('/admin/reviews/{id}/visibility', [AdminReviewController::class, 'updateVisibility']);
             Route::patch('/admin/review-reports/{id}', [AdminReviewController::class, 'updateReport']);

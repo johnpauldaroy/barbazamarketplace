@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Store;
+use App\Models\Unit;
+use App\Services\InventoryService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,8 @@ use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -237,34 +241,87 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
+            'price' => 'nullable|required_without:variants|numeric|min:0',
             'category' => 'required|string|max:100',
             'store_id' => 'nullable|integer|exists:stores,id',
+            'base_unit_id' => 'nullable|integer|exists:units,id',
             'image' => 'nullable',
-            'stock' => 'required|integer|min:0',
-            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000'
+            'stock' => 'required|numeric|min:0|max:999999999.999',
+            'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999',
+            'variants' => 'nullable|array|min:1',
+            'variants.*.name' => 'required_with:variants|string|max:100',
+            'variants.*.sku' => 'nullable|string|max:64',
+            'variants.*.base_unit_quantity' => 'required_with:variants|numeric|min:0.001',
+            'variants.*.price' => 'required_with:variants|numeric|min:0',
+            'variants.*.is_default' => 'nullable|boolean',
         ]);
 
         $storeId = $request->input('store_id')
             ? (int) $request->input('store_id')
             : Store::ensurePlatformStore()->id;
 
-        $data = $request->except('image');
-        $data['store_id'] = $storeId;
+        $unit = isset($validated['base_unit_id']) ? Unit::findOrFail($validated['base_unit_id']) : Unit::defaultUnit();
+        if (! $unit || (! $unit->is_active && isset($validated['base_unit_id']))) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['base_unit_id' => ['Choose an active measured inventory unit.']]);
+        }
+        $stock = (float) $validated['stock'];
+        $threshold = (float) ($validated['low_stock_threshold'] ?? 10);
+        $this->inventory->assertQuantityForUnit($stock, $unit, 'stock', true);
+        $this->inventory->assertQuantityForUnit($threshold, $unit, 'low_stock_threshold', true);
+
+        $variants = $validated['variants'] ?? [[
+            'name' => trim($validated['category']) ?: 'Default',
+            'base_unit_quantity' => 1,
+            'price' => (float) $validated['price'],
+            'is_default' => true,
+        ]];
+        foreach ($variants as $variant) {
+            $this->inventory->assertQuantityForUnit((float) $variant['base_unit_quantity'], $unit, 'variants', false);
+        }
+        $defaultIndex = collect($variants)->search(fn ($variant) => filter_var($variant['is_default'] ?? false, FILTER_VALIDATE_BOOLEAN));
+        $defaultIndex = $defaultIndex === false ? 0 : $defaultIndex;
+        $defaultPrice = (float) $variants[$defaultIndex]['price'];
+
+        $imagePath = null;
         
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('products', 'public');
-            $data['image'] = $imagePath;
         } elseif (is_string($request->image) && $request->image !== '') {
-            $data['image'] = $request->image;
+            $imagePath = $request->image;
         }
 
-        $this->ensureCategoryExists($data['category'] ?? null, $storeId);
-        $product = Product::create($data);
-        $product->load('store');
+        $this->ensureCategoryExists($validated['category'], $storeId);
+        $product = DB::transaction(function () use ($validated, $storeId, $unit, $stock, $threshold, $variants, $defaultIndex, $defaultPrice, $imagePath, $request) {
+            $product = Product::create([
+                'store_id' => $storeId,
+                'title' => trim($validated['title']),
+                'description' => $validated['description'] ?? null,
+                'price' => $defaultPrice,
+                'category' => $validated['category'],
+                'image' => $imagePath,
+                'stock' => 0,
+                'low_stock_threshold' => $threshold,
+                'base_unit_id' => $unit->id,
+                'has_variants' => count($variants) > 1,
+            ]);
+            foreach ($variants as $index => $variant) {
+                $product->variants()->create([
+                    'name' => trim($variant['name']),
+                    'sku' => $variant['sku'] ?? null,
+                    'base_unit_quantity' => (float) $variant['base_unit_quantity'],
+                    'price' => (float) $variant['price'],
+                    'is_default' => $index === $defaultIndex,
+                    'is_active' => true,
+                    'sort_order' => $index,
+                ]);
+            }
+            $this->inventory->movement($product, $stock, 'opening', $request->user()?->id, null, 'Opening inventory');
+            return $product;
+        });
+        $product->load(['store', 'baseUnit', 'variants']);
 
         return response()->json([
             'message' => 'Product created successfully',
@@ -276,18 +333,18 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
         
-        $request->validate([
+        $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric|min:0',
             'category' => 'sometimes|required|string|max:100',
             'store_id' => 'nullable|integer|exists:stores,id',
             'image' => 'nullable',
-            'stock' => 'sometimes|required|integer|min:0',
-            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000'
+            'stock' => 'sometimes|required|numeric|min:0|max:999999999.999',
+            'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999'
         ]);
 
-        $data = $request->except('image');
+        $data = collect($validated)->except(['image', 'stock'])->all();
         $targetStoreId = array_key_exists('store_id', $data)
             ? (int) $data['store_id']
             : (int) $product->store_id;
@@ -305,6 +362,15 @@ class ProductController extends Controller
         }
 
         $this->ensureCategoryExists($data['category'] ?? $product->category, $targetStoreId);
+        if (array_key_exists('low_stock_threshold', $data)) {
+            $this->inventory->assertQuantityForUnit((float) $data['low_stock_threshold'], $product->baseUnit, 'low_stock_threshold', true);
+        }
+        if (array_key_exists('stock', $validated) && (float) $validated['stock'] !== (float) $product->stock) {
+            $this->inventory->adjust($product, 'set', (float) $validated['stock'], $request->user()->id, 'Legacy product update');
+        }
+        if (array_key_exists('price', $data)) {
+            $product->ensureDefaultVariant()->update(['price' => $data['price']]);
+        }
         $product->update($data);
 
         return response()->json([
@@ -320,8 +386,9 @@ class ProductController extends Controller
             'products.*.title'    => 'required|string|max:255',
             'products.*.price'    => 'required|numeric|min:0',
             'products.*.category' => 'required|string|max:100',
-            'products.*.stock'    => 'required|integer|min:0',
-            'products.*.low_stock_threshold' => 'nullable|integer|min:0|max:100000',
+            'products.*.stock'    => 'required|numeric|min:0',
+            'products.*.low_stock_threshold' => 'nullable|numeric|min:0|max:999999999.999',
+            'products.*.base_unit_code' => 'nullable|string|exists:units,code',
             'products.*.description' => 'nullable|string',
             'products.*.store_id'    => 'nullable|integer|exists:stores,id',
         ]);
@@ -338,17 +405,19 @@ class ProductController extends Controller
 
                 $this->ensureCategoryExists($row['category'], $storeId);
 
-                $product = Product::create([
-                    'title'       => trim($row['title']),
-                    'description' => $row['description'] ?? null,
-                    'price'       => $row['price'],
-                    'category'    => $row['category'],
-                    'stock'       => $row['stock'],
-                    // Omitted in most CSV imports; fall back to the column default.
-                    'low_stock_threshold' => $row['low_stock_threshold'] ?? 10,
-                    'store_id'    => $storeId,
-                    'image'       => null,
-                ]);
+                $unit = isset($row['base_unit_code']) ? Unit::where('code', $row['base_unit_code'])->firstOrFail() : Unit::defaultUnit();
+                $this->inventory->assertQuantityForUnit((float) $row['stock'], $unit, 'stock', true);
+                $product = DB::transaction(function () use ($row, $storeId, $unit, $request) {
+                    $product = Product::create([
+                        'title' => trim($row['title']), 'description' => $row['description'] ?? null,
+                        'price' => $row['price'], 'category' => $row['category'], 'stock' => 0,
+                        'low_stock_threshold' => $row['low_stock_threshold'] ?? 10,
+                        'base_unit_id' => $unit->id, 'store_id' => $storeId, 'image' => null,
+                    ]);
+                    $product->ensureDefaultVariant();
+                    $this->inventory->movement($product, (float) $row['stock'], 'opening', $request->user()?->id, null, 'CSV opening inventory');
+                    return $product;
+                });
 
                 $product->load('store');
                 $created[] = $this->formatProduct($product);
@@ -500,7 +569,7 @@ class ProductController extends Controller
             ] : null,
             'has_variants' => (bool) $product->has_variants,
             'variants' => $this->formatVariants($product),
-            'low_stock_threshold' => (int) $product->low_stock_threshold,
+            'low_stock_threshold' => (float) $product->low_stock_threshold,
             'is_low_stock' => $product->isLowStock(),
             'is_in_stock' => (float) $product->stock > 0,
             'review_summary' => [

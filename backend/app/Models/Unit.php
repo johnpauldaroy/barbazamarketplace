@@ -13,11 +13,16 @@ class Unit extends Model
         'code',
         'label',
         'is_fractional',
+        'dimension',
+        'conversion_factor',
+        'is_active',
         'sort_order',
     ];
 
     protected $casts = [
         'is_fractional' => 'boolean',
+        'conversion_factor' => 'decimal:6',
+        'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
 

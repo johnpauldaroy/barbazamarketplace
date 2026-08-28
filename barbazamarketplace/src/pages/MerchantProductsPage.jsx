@@ -288,7 +288,7 @@ const MerchantProductsPage = () => {
                         <p className="text-sm font-bold text-slate-800">{defaultFormatPeso(product.displayAmount)}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock</p>
+                        <p className="text-xs font-medium text-slate-600">{product.displayStock} {product.base_unit?.code || 'pc'} in stock</p>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-[10px] font-medium text-slate-400 italic">View Only</span>
@@ -330,7 +330,7 @@ const MerchantProductsPage = () => {
                       <Badge variant="outline" className="border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         {product.displayCategory}
                       </Badge>
-                      <span className="text-xs font-medium text-slate-600">{product.displayStock} in stock</span>
+                      <span className="text-xs font-medium text-slate-600">{product.displayStock} {product.base_unit?.code || 'pc'} in stock</span>
                       <span className="text-[10px] font-medium italic text-slate-400">View Only</span>
                     </div>
                   </div>

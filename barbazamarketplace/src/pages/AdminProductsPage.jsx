@@ -8,8 +8,10 @@ import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import ProductVariantsEditor from '../components/ProductVariantsEditor';
+import ProductOptionsDraftEditor from '../components/ProductOptionsDraftEditor';
+import InventoryManager from '../components/InventoryManager';
 import { useToast } from '../components/ui/use-toast';
-import { bulkImportProducts, createProduct, deleteProduct, fetchAdminStores, fetchProducts, getCategories, updateProduct } from '../api/EcommerceApi';
+import { bulkImportProducts, createProduct, deleteProduct, fetchAdminStores, fetchProducts, fetchUnits, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
 import Pagination from '../components/ui/Pagination';
 
@@ -24,6 +26,8 @@ const INITIAL_FORM = {
   stockThreshold: '10',
   description: '',
   imageFile: null,
+  baseUnitId: '',
+  variants: [{ name: 'Per piece', base_unit_quantity: '1', price: '', is_default: true }],
 };
 
 const normalizeProduct = (product) => ({
@@ -50,6 +54,7 @@ const AdminProductsPage = () => {
   const [products, setProducts] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [stores, setStores] = useState([]);
+  const [units, setUnits] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -117,6 +122,10 @@ const AdminProductsPage = () => {
     loadStores();
   }, [loadStores]);
 
+  useEffect(() => {
+    fetchUnits().then((items) => setUnits(items)).catch(() => setUnits([]));
+  }, []);
+
   const loadCategoryOptions = useCallback(async (storeId = '') => {
     try {
       const categories = await getCategories({ store_id: storeId || undefined });
@@ -145,6 +154,7 @@ const AdminProductsPage = () => {
     },
     [products, categoryOptions]
   );
+  const selectedFormUnit = units.find((unit) => String(unit.id) === String(form.baseUnitId));
 
   const normalizedProducts = useMemo(
     () => products.map((product) => normalizeProduct(product)),
@@ -174,7 +184,8 @@ const AdminProductsPage = () => {
 
   const openAddDialog = () => {
     setEditingProduct(null);
-    setForm({ ...INITIAL_FORM, storeId: selectedStoreId });
+    const piece = units.find((unit) => unit.code === 'pc');
+    setForm({ ...INITIAL_FORM, storeId: selectedStoreId, baseUnitId: piece ? String(piece.id) : '' });
     setIsFormDialogOpen(true);
   };
 
@@ -189,6 +200,8 @@ const AdminProductsPage = () => {
       stockThreshold: product?.low_stock_threshold != null ? String(product.low_stock_threshold) : '10',
       description: product?.description || '',
       imageFile: null,
+      baseUnitId: product?.base_unit?.id != null ? String(product.base_unit.id) : '',
+      variants: [],
     });
     setIsFormDialogOpen(true);
   };
@@ -197,15 +210,28 @@ const AdminProductsPage = () => {
   // the table and a re-opened dialog do not show a stale set.
   const handleVariantsChange = (variants) => {
     const activeCount = variants.filter((variant) => variant.is_active).length;
+    const defaultPrice = Number((variants.find((variant) => variant.is_default) || variants[0])?.price || 0);
 
-    setEditingProduct((prev) => (prev ? { ...prev, variants, has_variants: activeCount > 1 } : prev));
+    setEditingProduct((prev) => (prev ? { ...prev, variants, price: defaultPrice, displayAmount: defaultPrice, has_variants: activeCount > 1 } : prev));
     setProducts((prev) =>
       prev.map((item) =>
         item.id === editingProduct?.id
-          ? normalizeProduct({ ...item, variants, has_variants: activeCount > 1 })
+          ? normalizeProduct({ ...item, price: defaultPrice, variants, has_variants: activeCount > 1 })
           : item
       )
     );
+  };
+
+  const handleInventoryProductChange = (nextProduct) => {
+    const normalized = normalizeProduct(nextProduct);
+    setEditingProduct(normalized);
+    setForm((prev) => ({
+      ...prev,
+      stock: String(normalized.stock),
+      stockThreshold: String(normalized.low_stock_threshold),
+      baseUnitId: String(normalized.base_unit?.id || ''),
+    }));
+    setProducts((prev) => prev.map((item) => (item.id === normalized.id ? normalizeProduct({ ...item, ...normalized }) : item)));
   };
 
   const openDeleteDialog = (product) => {
@@ -213,7 +239,7 @@ const AdminProductsPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const CSV_TEMPLATE = 'title,category,price,stock,low_stock_threshold,description,store_id\nSample Product,Local Food Products,99,50,10,Optional description,\n';
+  const CSV_TEMPLATE = 'title,category,price,stock,low_stock_threshold,base_unit_code,description,store_id\nSample Product,Local Food Products,99,50,10,pc,Optional description,\n';
 
   const downloadTemplate = () => {
     const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
@@ -255,6 +281,7 @@ const AdminProductsPage = () => {
             price: parseFloat(row.price) || 0,
             stock: parseInt(row.stock, 10) || 0,
             low_stock_threshold: row.low_stock_threshold ? parseInt(row.low_stock_threshold, 10) : null,
+            base_unit_code: row.base_unit_code || 'pc',
             description: row.description || null,
             store_id: row.store_id ? parseInt(row.store_id, 10) : null,
             _valid: Boolean(row.title && row.category && row.price > 0),
@@ -300,11 +327,13 @@ const AdminProductsPage = () => {
     const category = form.category.trim();
     const description = form.description.trim();
     const parsedStoreId = form.storeId ? Number(form.storeId) : null;
-    const parsedPrice = Number(form.price);
     const parsedStock = Number(form.stock);
     const parsedThreshold = Number(form.stockThreshold);
 
-    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedThreshold)) {
+    const defaultOption = form.variants.find((option) => option.is_default) || form.variants[0];
+    const effectivePrice = editingProduct ? Number(editingProduct.price) : Number(defaultOption?.price);
+
+    if (!title || !category || Number.isNaN(effectivePrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedThreshold) || (!editingProduct && !selectedFormUnit)) {
       toast({
         title: 'Invalid form input',
         description: 'Title, category, price, stock, and alert threshold are required.',
@@ -313,7 +342,7 @@ const AdminProductsPage = () => {
       return;
     }
 
-    if (parsedPrice < 0 || parsedStock < 0) {
+    if (effectivePrice < 0 || parsedStock < 0 || parsedThreshold < 0) {
       toast({
         title: 'Invalid numeric values',
         description: 'Price and stock must be zero or greater.',
@@ -326,11 +355,19 @@ const AdminProductsPage = () => {
       title,
       category,
       store_id: parsedStoreId || undefined,
-      price: parsedPrice,
-      stock: Math.floor(parsedStock),
-      low_stock_threshold: Math.floor(parsedThreshold),
+      low_stock_threshold: parsedThreshold,
       description,
     };
+
+    if (!editingProduct) {
+      payload.base_unit_id = Number(form.baseUnitId);
+      payload.stock = parsedStock;
+      payload.variants = form.variants.map((option) => ({
+        ...option,
+        base_unit_quantity: Number(option.base_unit_quantity),
+        price: Number(option.price),
+      }));
+    }
 
     if (form.imageFile) {
       payload.image = form.imageFile;
@@ -352,7 +389,7 @@ const AdminProductsPage = () => {
 
       loadCategoryOptions(form.storeId);
       setIsFormDialogOpen(false);
-      setForm({ ...INITIAL_FORM, storeId: selectedStoreId });
+      setForm({ ...INITIAL_FORM, storeId: selectedStoreId, baseUnitId: units.find((unit) => unit.code === 'pc')?.id || '' });
       setEditingProduct(null);
     } catch (error) {
       toast({
@@ -496,8 +533,8 @@ const AdminProductsPage = () => {
                               product.displayStock > (product.low_stock_threshold ?? 10) ? 'bg-emerald-500' : product.displayStock > 0 ? 'bg-amber-500' : 'bg-rose-500'
                             }`}
                           />
-                          <p className="text-xs font-medium text-slate-600">{product.displayStock} in stock 
-                            <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(Alert: {product.low_stock_threshold ?? 10})</span></p>
+                          <p className="text-xs font-medium text-slate-600">{product.displayStock} {product.base_unit?.code || 'pc'} in stock
+                            <span className="ml-1.5 text-[10px] text-slate-400 font-normal">(Alert: {product.low_stock_threshold ?? 10} {product.base_unit?.code || 'pc'})</span></p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -612,46 +649,33 @@ const AdminProductsPage = () => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="product-stock">Current Stock</Label>
-                <Input
-                  id="product-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.stock}
-                  onChange={(event) => updateFormField('stock', event.target.value)}
-                  placeholder="0"
-                  required
-                />
+                <Label htmlFor="product-unit">Inventory Unit</Label>
+                {editingProduct ? <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">{editingProduct.base_unit?.label || 'Piece'} ({editingProduct.base_unit?.code || 'pc'})</div> : <select id="product-unit" value={form.baseUnitId} onChange={(event) => {
+                  const nextUnit = units.find((unit) => String(unit.id) === event.target.value);
+                  updateFormField('baseUnitId', event.target.value);
+                  if (form.variants.length === 1 && /^Per |^1 /.test(form.variants[0].name)) updateFormField('variants', [{ ...form.variants[0], name: nextUnit?.code === 'pc' ? 'Per piece' : `1 ${nextUnit?.code}` }]);
+                }} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none focus:border-[#2954C8] sm:text-sm" required><option value="">Choose a unit</option>{units.filter((unit) => unit.is_active).map((unit) => <option key={unit.id} value={unit.id}>{unit.label} ({unit.code})</option>)}</select>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="product-threshold">Stock Alert Threshold</Label>
+                <Label htmlFor="product-stock">{editingProduct ? 'Stock on hand' : `Opening stock${selectedFormUnit ? ` (${selectedFormUnit.code})` : ''}`}</Label>
+                {editingProduct ? <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">{form.stock} {editingProduct.base_unit?.code || 'pc'}</div> : <Input id="product-stock" className="text-base sm:text-sm" type="number" min="0" step={selectedFormUnit?.is_fractional ? '0.001' : '1'} value={form.stock} onChange={(event) => updateFormField('stock', event.target.value)} placeholder="0" required />}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="product-threshold">Low-stock alert ({editingProduct?.base_unit?.code || selectedFormUnit?.code || 'unit'})</Label>
                 <Input
                   id="product-threshold"
+                  className="text-base sm:text-sm"
                   type="number"
                   min="0"
-                  step="1"
+                  step={(editingProduct?.base_unit || selectedFormUnit)?.is_fractional ? '0.001' : '1'}
                   value={form.stockThreshold}
                   onChange={(event) => updateFormField('stockThreshold', event.target.value)}
                   placeholder="10"
                   required
                 />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="product-price">Price</Label>
-              <Input
-                id="product-price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.price}
-                onChange={(event) => updateFormField('price', event.target.value)}
-                placeholder="0.00"
-                required
-              />
             </div>
 
             <div className="space-y-2">
@@ -676,22 +700,13 @@ const AdminProductsPage = () => {
               />
             </div>
 
-            {/* Variants attach to a product id, so they are set up after saving. */}
             {editingProduct?.id ? (
-              <ProductVariantsEditor
-                productId={editingProduct.id}
-                baseUnitCode={editingProduct.base_unit?.code || 'pc'}
-                stock={editingProduct.stock}
-                onVariantsChange={handleVariantsChange}
-              />
+              <>
+                <InventoryManager product={editingProduct} units={units} onProductChange={handleInventoryProductChange} />
+                <ProductVariantsEditor productId={editingProduct.id} baseUnitCode={editingProduct.base_unit?.code || 'pc'} stock={editingProduct.stock} onVariantsChange={handleVariantsChange} />
+              </>
             ) : (
-              <div className="rounded-lg border border-dashed border-[#dfe7f4] bg-[#f8fafd] p-3">
-                <p className="text-xs font-semibold text-[#0b1739]">Selling by pack, sack or piece?</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Create the product first, then reopen it to add options like &ldquo;5kg Pack&rdquo; or
-                  &ldquo;25kg Sack&rdquo;. They all share the stock you set above.
-                </p>
-              </div>
+              <ProductOptionsDraftEditor options={form.variants} onChange={(variants) => updateFormField('variants', variants)} unitCode={selectedFormUnit?.code || 'pc'} stock={form.stock} fractional={!!selectedFormUnit?.is_fractional} />
             )}
 
             <DialogFooter>

@@ -16,6 +16,7 @@ class OrderItem extends Model
         'variant_name',
         'quantity',
         'base_units_deducted',
+        'inventory_unit_id',
         'price',
     ];
 
@@ -38,6 +39,11 @@ class OrderItem extends Model
     public function variant()
     {
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function inventoryUnit()
+    {
+        return $this->belongsTo(Unit::class, 'inventory_unit_id');
     }
 
     /**

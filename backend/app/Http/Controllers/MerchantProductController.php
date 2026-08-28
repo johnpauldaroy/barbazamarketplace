@@ -29,7 +29,7 @@ class MerchantProductController extends Controller
         $sort = $validated['sort'] ?? 'name';
 
         $products = $this->applyVisibleReviewSummary(
-            Product::query()->with('store')
+            Product::query()->with(['store', 'baseUnit', 'variants'])
         )
             ->where('store_id', $storeId)
             ->when($search !== '', function ($query) use ($search) {
@@ -302,10 +302,26 @@ class MerchantProductController extends Controller
             'category_slug' => Str::slug($product->category ?? 'general'),
             'image' => $product->image,
             'image_url' => $product->image_url,
-            'stock' => (int) $product->stock,
-            'low_stock_threshold' => (int) $product->low_stock_threshold,
+            'stock' => (float) $product->stock,
+            'base_unit' => $product->baseUnit ? [
+                'id' => $product->baseUnit->id,
+                'code' => $product->baseUnit->code,
+                'label' => $product->baseUnit->label,
+                'is_fractional' => (bool) $product->baseUnit->is_fractional,
+            ] : null,
+            'has_variants' => (bool) $product->has_variants,
+            'variants' => $product->variants->where('is_active', true)->map(function ($variant) use ($product) {
+                $variant->setRelation('product', $product);
+                return [
+                    'id' => $variant->id, 'name' => $variant->name, 'sku' => $variant->sku,
+                    'base_unit_quantity' => (float) $variant->base_unit_quantity,
+                    'price' => (float) $variant->price, 'is_default' => (bool) $variant->is_default,
+                    'available_quantity' => $variant->availableQuantity(),
+                ];
+            })->values(),
+            'low_stock_threshold' => (float) $product->low_stock_threshold,
             'is_low_stock' => $product->isLowStock(),
-            'is_in_stock' => (int) $product->stock > 0,
+            'is_in_stock' => (float) $product->stock > 0,
             'review_summary' => [
                 'average_rating' => round((float) ($product->visible_reviews_average_rating ?? 0), 2),
                 'ratings_count' => (int) ($product->visible_reviews_count ?? 0),

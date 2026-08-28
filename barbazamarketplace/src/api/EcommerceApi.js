@@ -313,6 +313,19 @@ export const deleteAdminUser = async (id) => {
 };
 
 // Product management (admin)
+const appendFormValue = (formData, key, value) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+        value.forEach((entry, index) => appendFormValue(formData, `${key}[${index}]`, entry));
+        return;
+    }
+    if (typeof value === 'object' && !(value instanceof File)) {
+        Object.entries(value).forEach(([childKey, childValue]) => appendFormValue(formData, `${key}[${childKey}]`, childValue));
+        return;
+    }
+    formData.append(key, value instanceof File ? value : String(value));
+};
+
 export const createProduct = async (productData) => {
     try {
         const formData = new FormData();
@@ -320,7 +333,7 @@ export const createProduct = async (productData) => {
             if (key === 'image' && productData[key] instanceof File) {
                 formData.append('image', productData[key]);
             } else if (productData[key] !== null && productData[key] !== undefined) {
-                formData.append(key, productData[key]);
+                appendFormValue(formData, key, productData[key]);
             } else {
                 // Skip nullish values so optional fields are not sent as "undefined".
             }
@@ -342,7 +355,7 @@ export const updateProduct = async (id, productData) => {
             if (key === 'image' && productData[key] instanceof File) {
                 formData.append('image', productData[key]);
             } else if (productData[key] !== null && productData[key] !== undefined) {
-                formData.append(key, productData[key]);
+                appendFormValue(formData, key, productData[key]);
             }
         });
         formData.append('_method', 'PUT');
@@ -832,3 +845,20 @@ export const deleteProductVariant = async (productId, variantId) => {
         throw error;
     }
 };
+
+export const fetchInventoryMovements = async (productId) => {
+    const data = await apiRequest(`/products/${productId}/inventory-movements`);
+    return data?.movements || [];
+};
+
+export const adjustProductInventory = async (productId, payload) => apiRequest(`/products/${productId}/inventory-adjustments`, {
+    method: 'POST', body: JSON.stringify(payload),
+});
+
+export const previewProductUnitConversion = async (productId, payload) => apiRequest(`/products/${productId}/unit-conversion/preview`, {
+    method: 'POST', body: JSON.stringify(payload),
+});
+
+export const convertProductUnit = async (productId, payload) => apiRequest(`/products/${productId}/unit-conversion`, {
+    method: 'POST', body: JSON.stringify(payload),
+});

@@ -26,7 +26,7 @@ class Product extends Model
         'price' => 'decimal:2',
         // Stock counts base units, which may be fractional for weight/volume.
         'stock' => 'decimal:3',
-        'low_stock_threshold' => 'integer',
+        'low_stock_threshold' => 'decimal:3',
         'has_variants' => 'boolean',
     ];
 
@@ -75,6 +75,11 @@ class Product extends Model
     public function baseUnit()
     {
         return $this->belongsTo(Unit::class, 'base_unit_id');
+    }
+
+    public function inventoryMovements()
+    {
+        return $this->hasMany(InventoryMovement::class);
     }
 
     /**

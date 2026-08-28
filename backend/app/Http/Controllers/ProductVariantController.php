@@ -26,6 +26,9 @@ class ProductVariantController extends Controller
                     'code' => $unit->code,
                     'label' => $unit->label,
                     'is_fractional' => (bool) $unit->is_fractional,
+                    'dimension' => $unit->dimension,
+                    'conversion_factor' => (float) $unit->conversion_factor,
+                    'is_active' => (bool) $unit->is_active,
                 ]),
         ]);
     }
@@ -56,6 +59,7 @@ class ProductVariantController extends Controller
         });
 
         $this->syncHasVariants($product);
+        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option added',
@@ -76,6 +80,7 @@ class ProductVariantController extends Controller
         });
 
         $this->syncHasVariants($product);
+        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option updated',
@@ -95,6 +100,7 @@ class ProductVariantController extends Controller
             $variant->update(['is_active' => false]);
             $this->normaliseDefaults($product, null);
             $this->syncHasVariants($product);
+            $this->syncProductPrice($product);
 
             return response()->json([
                 'message' => 'Option has past orders, so it was hidden instead of deleted.',
@@ -114,6 +120,7 @@ class ProductVariantController extends Controller
         });
 
         $this->syncHasVariants($product);
+        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option removed',
@@ -210,6 +217,14 @@ class ProductVariantController extends Controller
     {
         $count = $product->variants()->where('is_active', true)->count();
         $product->forceFill(['has_variants' => $count > 1])->save();
+    }
+
+    protected function syncProductPrice(Product $product): void
+    {
+        $default = $product->fresh()->defaultVariant();
+        if ($default) {
+            $product->forceFill(['price' => $default->price])->save();
+        }
     }
 
     protected function serialize(Product $product): array

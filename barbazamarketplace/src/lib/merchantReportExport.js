@@ -51,12 +51,21 @@ export const buildMerchantReportRows = (orders = []) => orders.flatMap((order) =
   }));
 });
 
+const estimatedRetailValue = (product) => {
+  const options = Array.isArray(product?.variants) ? product.variants : [];
+  const defaultOption = options.find((option) => option.is_default) || options[0];
+  const ratio = Number(defaultOption?.base_unit_quantity || 1);
+  const price = Number(defaultOption?.price ?? product?.price ?? 0);
+  return ratio > 0 ? Number(product?.stock || 0) / ratio * price : 0;
+};
+
 const inventoryRows = (products = []) => products.map((product) => ({
   Product: product?.title || product?.name || '',
   Category: product?.category || 'Uncategorized',
   'Unit Price': formatNumber(product?.price),
   Stock: Number(product?.stock || 0),
-  'Inventory Value': formatNumber(Number(product?.price || 0) * Number(product?.stock || 0)),
+  'Stock Unit': product?.base_unit?.code || 'pc',
+  'Estimated Retail Value': formatNumber(estimatedRetailValue(product)),
 }));
 
 const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -100,7 +109,7 @@ export const exportMerchantReportExcel = async ({ orders, products, storeName, s
   const orderSheet = XLSX.utils.json_to_sheet(buildMerchantReportRows(orders), { header: REPORT_COLUMNS });
   orderSheet['!cols'] = REPORT_COLUMNS.map((column) => ({ wch: Math.max(12, Math.min(28, column.length + 5)) }));
   const stockSheet = XLSX.utils.json_to_sheet(inventoryRows(products));
-  stockSheet['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
+  stockSheet['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 24 }];
 
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
   XLSX.utils.book_append_sheet(workbook, orderSheet, 'Order Items');

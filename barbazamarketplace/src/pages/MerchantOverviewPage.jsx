@@ -160,7 +160,13 @@ const MerchantOverviewPage = () => {
   const inventoryValue = useMemo(
     () =>
       products.reduce(
-        (total, product) => total + Number(product?.price || 0) * Number(product?.stock || 0),
+        (total, product) => {
+          const options = Array.isArray(product?.variants) ? product.variants : [];
+          const defaultOption = options.find((option) => option.is_default) || options[0];
+          const ratio = Number(defaultOption?.base_unit_quantity || 1);
+          const price = Number(defaultOption?.price ?? product?.price ?? 0);
+          return total + (ratio > 0 ? Number(product?.stock || 0) / ratio * price : 0);
+        },
         0
       ),
     [products]
@@ -487,7 +493,7 @@ const MerchantOverviewPage = () => {
 
         <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold text-slate-500">Inventory Value</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500">Estimated Retail Inventory Value</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-slate-800 sm:text-3xl">{loading ? '--' : formatPeso(inventoryValue)}</p>

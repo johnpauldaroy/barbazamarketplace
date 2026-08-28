@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\StorePaymentMethod;
 use App\Models\User;
+use App\Services\InventoryService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -25,6 +26,8 @@ use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     protected const STATUS_FLOW = [
         'pending',
         'processing',
@@ -772,8 +775,7 @@ class OrderController extends Controller
                         ]);
                     }
 
-                    $product->stock = round((float) $product->stock - $baseUnitsNeeded, 3);
-                    $product->save();
+                    $this->inventory->movement($product, -$baseUnitsNeeded, 'sale', $user->id, $order->id, "Order #{$order->id}");
 
                     // Price is always taken from the server side, never the payload.
                     $unitPrice = round((float) ($variant->price ?? $product->price), 2);
@@ -787,6 +789,7 @@ class OrderController extends Controller
                         'variant_name' => $variant?->name,
                         'quantity' => $requestedQty,
                         'base_units_deducted' => $baseUnitsNeeded,
+                        'inventory_unit_id' => $product->base_unit_id,
                         'price' => $unitPrice,
                     ]);
                 }
@@ -1058,7 +1061,8 @@ class OrderController extends Controller
             if ($item->product) {
                 // Return the base units this line consumed, not the item count:
                 // cancelling one 25kg sack must put back 25, not 1.
-                $item->product->increment('stock', $item->baseUnitsDeducted());
+                $product = Product::query()->lockForUpdate()->findOrFail($item->product_id);
+                $this->inventory->movement($product, $item->baseUnitsDeducted(), 'cancellation', Auth::id(), $order->id, "Inventory restored for order #{$order->id}");
             }
         }
     }
@@ -1068,7 +1072,7 @@ class OrderController extends Controller
         $order->loadMissing('items.product.store');
 
         foreach ($order->items as $item) {
-            $product = $item->product;
+            $product = Product::query()->lockForUpdate()->find($item->product_id);
 
             if (! $product) {
                 continue;
@@ -1082,7 +1086,7 @@ class OrderController extends Controller
                 ]);
             }
 
-            $product->decrement('stock', $baseUnits);
+            $this->inventory->movement($product, -$baseUnits, 'reactivation', Auth::id(), $order->id, "Inventory reserved again for order #{$order->id}");
         }
     }
 }
