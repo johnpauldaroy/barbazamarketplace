@@ -68,7 +68,7 @@ class OrderController extends Controller
         }
         $orders = $orderQuery->get();
 
-        $products = Product::query()->orderBy('title')->get();
+        $products = Product::query()->with('baseUnit')->orderBy('title')->get();
 
         $productSalesQuery = OrderItem::query()
             ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(quantity * price) as revenue'))
@@ -117,7 +117,8 @@ class OrderController extends Controller
                     'category' => $product->category,
                     'image' => $product->image,
                     'image_url' => $product->image_url,
-                    'stock' => (int) $product->stock,
+                    'stock' => (float) $product->stock,
+                    'stock_unit' => $product->baseUnit?->code ?? 'pc',
                     'units_sold' => (int) ($sales->units_sold ?? 0),
                     'revenue' => round((float) ($sales->revenue ?? 0), 2),
                 ];
@@ -140,7 +141,8 @@ class OrderController extends Controller
                 'id' => $product->id,
                 'title' => $product->title,
                 'category' => $product->category,
-                'stock' => (int) $product->stock,
+                'stock' => (float) $product->stock,
+                'stock_unit' => $product->baseUnit?->code ?? 'pc',
                 'image' => $product->image,
                 'image_url' => $product->image_url,
             ])
@@ -171,7 +173,7 @@ class OrderController extends Controller
                 'total_products' => $products->count(),
                 'active_categories' => $products->pluck('category')->filter()->unique()->count(),
                 'low_stock_products' => $products->filter(fn (Product $product) => $product->isLowStock())->count(),
-                'out_of_stock_products' => $products->filter(fn (Product $product) => (int) $product->stock <= 0)->count(),
+                'out_of_stock_products' => $products->filter(fn (Product $product) => (float) $product->stock <= 0)->count(),
             ],
             'monthly_sales' => $monthlySales,
             'status_breakdown' => $statusBreakdown,
@@ -345,7 +347,7 @@ class OrderController extends Controller
         }
         $productSales = $productSalesQuery->get()->keyBy('product_id');
 
-        $productQuery = Product::query()->with('store');
+        $productQuery = Product::query()->with(['store', 'baseUnit']);
         if ($storeId) {
             $productQuery->where('store_id', $storeId);
         }
@@ -359,7 +361,8 @@ class OrderController extends Controller
             'title' => $p->title,
             'category' => $p->category,
             'store' => optional($p->store)->name ?? 'N/A',
-            'stock' => (int) $p->stock,
+            'stock' => (float) $p->stock,
+            'stock_unit' => $p->baseUnit?->code ?? 'pc',
             'units_sold' => (int) ($productSales->get($p->id)?->units_sold ?? 0),
             'revenue' => round((float) ($productSales->get($p->id)?->revenue ?? 0), 2),
             'image_url' => $p->image_url,
@@ -408,7 +411,8 @@ class OrderController extends Controller
                 'title' => $p->title,
                 'category' => $p->category,
                 'store' => optional($p->store)->name ?? 'N/A',
-                'stock' => (int) $p->stock,
+                'stock' => (float) $p->stock,
+                'stock_unit' => $p->baseUnit?->code ?? 'pc',
             ])->values();
 
         // Available filter options

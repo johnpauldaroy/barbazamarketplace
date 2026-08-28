@@ -281,6 +281,10 @@ class ProductController extends Controller
         foreach ($variants as $variant) {
             $this->inventory->assertQuantityForUnit((float) $variant['base_unit_quantity'], $unit, 'variants', false);
         }
+        $names = collect($variants)->map(fn ($variant) => mb_strtolower(trim($variant['name'])));
+        if ($names->unique()->count() !== $names->count()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['variants' => ['Selling option names must be unique.']]);
+        }
         $defaultIndex = collect($variants)->search(fn ($variant) => filter_var($variant['is_default'] ?? false, FILTER_VALIDATE_BOOLEAN));
         $defaultIndex = $defaultIndex === false ? 0 : $defaultIndex;
         $defaultPrice = (float) $variants[$defaultIndex]['price'];

@@ -314,7 +314,7 @@ const AdminOverviewPage = () => {
                       <p className="text-[10px] text-slate-400">{p.category}</p>
                     </div>
                     <Badge className={`shrink-0 text-[10px] font-bold ${p.stock === 0 ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700'}`}>
-                      {p.stock === 0 ? 'Out of stock' : `${p.stock} left`}
+                      {p.stock === 0 ? 'Out of stock' : `${p.stock} ${p.stock_unit || 'pc'} left`}
                     </Badge>
                   </div>
                 ))}

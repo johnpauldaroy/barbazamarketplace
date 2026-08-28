@@ -105,13 +105,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/admin/review-reports/{id}', [AdminReviewController::class, 'updateReport']);
         });
 
-        // Variant management: merchants are scoped to their own store inside the
-        // controller, admins may manage any product. Kept out of the 'merchant'
-        // group because that middleware rejects admins.
+        // Merchants may read their own options; only admins may change them.
         Route::get('/products/{productId}/variants', [ProductVariantController::class, 'index']);
-        Route::post('/products/{productId}/variants', [ProductVariantController::class, 'store']);
-        Route::put('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'update']);
-        Route::delete('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'destroy']);
+        Route::post('/products/{productId}/variants', [ProductVariantController::class, 'store'])->middleware('admin');
+        Route::put('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'update'])->middleware('admin');
+        Route::delete('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'destroy'])->middleware('admin');
 
         Route::middleware('merchant')->group(function () {
             Route::get('/merchant/store', [MerchantStoreController::class, 'show']);

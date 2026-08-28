@@ -82,6 +82,36 @@ class UnitAwareInventoryTest extends TestCase
         $this->postJson("/api/products/{$product->id}/unit-conversion", ['base_unit_id' => $g->id, 'version' => $preview['version'], 'reason' => 'Stale attempt'])->assertUnprocessable()->assertJsonValidationErrors('version');
     }
 
+    public function test_cross_dimension_conversion_uses_explicit_equivalence(): void
+    {
+        $piece = Unit::where('code', 'pc')->firstOrFail();
+        $kg = Unit::where('code', 'kg')->firstOrFail();
+        $product = Product::create(['store_id' => $this->store->id, 'title' => 'Rice sacks', 'category' => 'Grains', 'price' => 1300, 'stock' => 2, 'low_stock_threshold' => 1, 'base_unit_id' => $piece->id]);
+        $variant = $product->variants()->create(['name' => '25kg Sack', 'base_unit_quantity' => 1, 'price' => 1300, 'is_default' => true]);
+
+        $preview = $this->postJson("/api/products/{$product->id}/unit-conversion/preview", ['base_unit_id' => $kg->id, 'conversion_factor' => 25])->assertOk()->json('preview');
+        $this->assertEquals(50, $preview['stock']['after']);
+        $this->assertEquals(25, $preview['variants'][0]['after']);
+        $this->postJson("/api/products/{$product->id}/unit-conversion", ['base_unit_id' => $kg->id, 'conversion_factor' => 25, 'version' => $preview['version'], 'reason' => 'Convert legacy sacks to weight'])->assertOk();
+        $this->assertEquals(25, (float) $variant->fresh()->base_unit_quantity);
+    }
+
+    public function test_cancellation_restores_converted_order_deduction_exactly(): void
+    {
+        $product = $this->makeProduct();
+        $product->update(['stock' => 45]);
+        $variant = $product->variants()->create(['name' => '5kg Pack', 'base_unit_quantity' => 5, 'price' => 280, 'is_default' => true]);
+        $order = Order::create(['user_id' => $this->admin->id, 'total_amount' => 280, 'shipping_address' => 'Test', 'status' => 'pending']);
+        OrderItem::create(['order_id' => $order->id, 'product_id' => $product->id, 'product_variant_id' => $variant->id, 'quantity' => 1, 'base_units_deducted' => 5, 'inventory_unit_id' => $product->base_unit_id, 'price' => 280]);
+        $g = Unit::where('code', 'g')->firstOrFail();
+        $preview = $this->postJson("/api/products/{$product->id}/unit-conversion/preview", ['base_unit_id' => $g->id])->json('preview');
+        $this->postJson("/api/products/{$product->id}/unit-conversion", ['base_unit_id' => $g->id, 'version' => $preview['version'], 'reason' => 'Use grams'])->assertOk();
+
+        $this->patchJson("/api/orders/{$order->id}/status", ['status' => 'cancelled'])->assertOk();
+        $this->assertEquals(50000, (float) $product->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', ['product_id' => $product->id, 'order_id' => $order->id, 'type' => 'cancellation']);
+    }
+
     public function test_packaging_units_are_legacy_and_piece_rejects_fractions(): void
     {
         $units = collect($this->getJson('/api/units')->assertOk()->json('units'))->keyBy('code');

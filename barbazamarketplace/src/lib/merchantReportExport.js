@@ -102,7 +102,7 @@ export const exportMerchantReportExcel = async ({ orders, products, storeName, s
     ['Gross Revenue', summary.grossRevenue],
     ['Average Order Value', summary.averageOrderValue],
     ['Products', summary.products],
-    ['Inventory Value', summary.inventoryValue],
+    ['Estimated Retail Inventory Value', summary.inventoryValue],
   ]);
   summarySheet['!cols'] = [{ wch: 24 }, { wch: 28 }];
 
@@ -130,7 +130,7 @@ export const exportMerchantReportPdf = async ({ orders, storeName, summary, filt
   autoTable(documentPdf, {
     startY: 76,
     theme: 'grid',
-    head: [['Orders', 'Gross Revenue', 'Average Order Value', 'Products', 'Inventory Value']],
+    head: [['Orders', 'Gross Revenue', 'Average Order Value', 'Products', 'Estimated Retail Inventory Value']],
     body: [[
       String(summary.orders),
       `PHP ${formatNumber(summary.grossRevenue).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,

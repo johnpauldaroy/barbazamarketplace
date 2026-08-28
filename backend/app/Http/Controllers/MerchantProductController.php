@@ -79,6 +79,8 @@ class MerchantProductController extends Controller
 
     public function store(Request $request)
     {
+        abort(403, 'Product management is restricted to administrators.');
+
         $storeId = (int) $request->user()->store_id;
 
         $request->validate([
@@ -112,6 +114,8 @@ class MerchantProductController extends Controller
 
     public function update(Request $request, int $id)
     {
+        abort(403, 'Product management is restricted to administrators.');
+
         $storeId = (int) $request->user()->store_id;
         $product = Product::query()
             ->where('store_id', $storeId)
@@ -151,6 +155,8 @@ class MerchantProductController extends Controller
 
     public function destroy(Request $request, int $id)
     {
+        abort(403, 'Product management is restricted to administrators.');
+
         $storeId = (int) $request->user()->store_id;
         $product = Product::query()
             ->where('store_id', $storeId)

@@ -135,22 +135,17 @@ class AdminUserController extends Controller
     public function destroy(Request $request, int $id)
     {
         $user = User::findOrFail($id);
-        if ($user->is_merchant) {
-            return response()->json([
-                'message' => 'Merchant accounts must be managed from store management.',
-            ], 422);
-        }
-
         if ($request->user()->id === $user->id) {
             return response()->json([
                 'message' => 'You cannot delete your own account.',
             ], 422);
         }
 
+        $isMerchant = (bool) $user->is_merchant;
         $user->delete();
 
         return response()->json([
-            'message' => 'User deleted successfully',
+            'message' => $isMerchant ? 'Merchant account deleted successfully' : 'User deleted successfully',
         ]);
     }
 

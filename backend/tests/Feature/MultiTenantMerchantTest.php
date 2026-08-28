@@ -82,6 +82,23 @@ class MultiTenantMerchantTest extends TestCase
         );
     }
 
+    public function test_admin_can_delete_merchant_account_without_deleting_store_catalog(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::create(['name' => 'Preserved Store', 'slug' => 'preserved-store', 'status' => 'active']);
+        $merchant = User::factory()->create(['is_merchant' => true, 'store_id' => $store->id]);
+        $product = Product::create(['store_id' => $store->id, 'title' => 'Preserved Product', 'price' => 50, 'category' => 'Goods', 'stock' => 5]);
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson("/api/admin/users/{$merchant->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Merchant account deleted successfully');
+
+        $this->assertDatabaseMissing('users', ['id' => $merchant->id]);
+        $this->assertDatabaseHas('stores', ['id' => $store->id]);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'store_id' => $store->id]);
+    }
+
     public function test_customer_cannot_access_admin_or_merchant_endpoints(): void
     {
         $customer = User::factory()->create([
@@ -96,7 +113,7 @@ class MultiTenantMerchantTest extends TestCase
         $this->getJson('/api/merchant/store')->assertForbidden();
     }
 
-    public function test_merchant_product_crud_is_scoped_to_own_store(): void
+    public function test_merchant_product_management_is_view_only(): void
     {
         $storeA = Store::create([
             'name' => 'Store A',
@@ -128,20 +145,16 @@ class MultiTenantMerchantTest extends TestCase
             'category' => 'Snacks',
             'stock' => 12,
         ]);
-        $createResponse->assertCreated();
-        $productId = $createResponse->json('product.id');
-        $this->assertNotNull($productId);
-        $this->assertDatabaseHas('products', [
-            'id' => $productId,
-            'store_id' => $storeA->id,
-        ]);
+        $createResponse->assertForbidden();
+
+        $productId = Product::create(['store_id' => $storeA->id, 'title' => 'Admin Product', 'price' => 100, 'category' => 'Snacks', 'stock' => 12])->id;
 
         Sanctum::actingAs($merchantB);
         $this->putJson("/api/merchant/products/{$productId}", [
             'title' => 'Hacked title',
-        ])->assertNotFound();
+        ])->assertForbidden();
 
-        $this->deleteJson("/api/merchant/products/{$productId}")->assertNotFound();
+        $this->deleteJson("/api/merchant/products/{$productId}")->assertForbidden();
     }
 
     public function test_public_registration_creates_customer_role_only(): void

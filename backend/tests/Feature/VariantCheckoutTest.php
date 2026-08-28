@@ -170,6 +170,7 @@ class VariantCheckoutTest extends TestCase
 
         // 2 sacks = 50kg, emptying the pool.
         $this->assertEquals(0.0, (float) $this->product->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', ['product_id' => $this->product->id, 'type' => 'sale', 'quantity_delta' => -50]);
 
         $admin = User::factory()->create(['is_admin' => true]);
         Sanctum::actingAs($admin);
@@ -179,6 +180,11 @@ class VariantCheckoutTest extends TestCase
 
         // Cancelling must return 50kg, not 2 units.
         $this->assertEquals(50.0, (float) $this->product->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', ['product_id' => $this->product->id, 'order_id' => $order->id, 'type' => 'cancellation', 'quantity_delta' => 50]);
+
+        $this->patchJson("/api/orders/{$order->id}/status", ['status' => 'pending'])->assertOk();
+        $this->assertEquals(0.0, (float) $this->product->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', ['product_id' => $this->product->id, 'order_id' => $order->id, 'type' => 'reactivation', 'quantity_delta' => -50]);
     }
 
     public function test_product_api_exposes_variants_with_availability(): void

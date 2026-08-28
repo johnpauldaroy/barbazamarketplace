@@ -22,6 +22,7 @@ return new class extends Migration
         DB::table('units')->where('code', 'L')->update(['dimension' => 'volume', 'conversion_factor' => 1000, 'is_active' => true]);
         DB::table('units')->whereIn('code', ['pack', 'box', 'sack', 'bag'])->update(['dimension' => 'package', 'is_active' => false]);
 
+        $now = now();
         Schema::table('products', function (Blueprint $table) {
             $table->decimal('low_stock_threshold', 12, 3)->default(10)->change();
         });
@@ -53,7 +54,6 @@ return new class extends Migration
             $table->index(['product_id', 'created_at']);
         });
 
-        $now = now();
         DB::table('products')->orderBy('id')->chunkById(500, function ($products) use ($now) {
             DB::table('inventory_movements')->insert($products->map(fn ($product) => [
                 'product_id' => $product->id,

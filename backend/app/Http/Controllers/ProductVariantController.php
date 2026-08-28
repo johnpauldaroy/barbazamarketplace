@@ -54,12 +54,11 @@ class ProductVariantController extends Controller
         $variant = DB::transaction(function () use ($product, $data) {
             $variant = $product->variants()->create($data);
             $this->normaliseDefaults($product, $variant);
+            $this->syncHasVariants($product);
+            $this->syncProductPrice($product);
 
             return $variant;
         });
-
-        $this->syncHasVariants($product);
-        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option added',
@@ -77,10 +76,9 @@ class ProductVariantController extends Controller
         DB::transaction(function () use ($product, $variant, $data) {
             $variant->update($data);
             $this->normaliseDefaults($product, $variant);
+            $this->syncHasVariants($product);
+            $this->syncProductPrice($product);
         });
-
-        $this->syncHasVariants($product);
-        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option updated',
@@ -97,10 +95,12 @@ class ProductVariantController extends Controller
         // Order history references variants, so one that has sold is deactivated
         // rather than deleted: receipts must keep resolving.
         if ($variant->orderItems()->exists()) {
-            $variant->update(['is_active' => false]);
-            $this->normaliseDefaults($product, null);
-            $this->syncHasVariants($product);
-            $this->syncProductPrice($product);
+            DB::transaction(function () use ($variant, $product) {
+                $variant->update(['is_active' => false]);
+                $this->normaliseDefaults($product, null);
+                $this->syncHasVariants($product);
+                $this->syncProductPrice($product);
+            });
 
             return response()->json([
                 'message' => 'Option has past orders, so it was hidden instead of deleted.',
@@ -117,10 +117,9 @@ class ProductVariantController extends Controller
         DB::transaction(function () use ($product, $variant) {
             $variant->delete();
             $this->normaliseDefaults($product->fresh(), null);
+            $this->syncHasVariants($product);
+            $this->syncProductPrice($product);
         });
-
-        $this->syncHasVariants($product);
-        $this->syncProductPrice($product);
 
         return response()->json([
             'message' => 'Option removed',
@@ -128,9 +127,7 @@ class ProductVariantController extends Controller
         ]);
     }
 
-    /**
-     * Merchants may only touch their own store's products; admins may touch any.
-     */
+    /** Resolve a visible product; write routes are additionally admin-only. */
     protected function authorizeProduct(Request $request, int $productId): Product
     {
         $user = $request->user();

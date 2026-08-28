@@ -323,7 +323,7 @@ const appendFormValue = (formData, key, value) => {
         Object.entries(value).forEach(([childKey, childValue]) => appendFormValue(formData, `${key}[${childKey}]`, childValue));
         return;
     }
-    formData.append(key, value instanceof File ? value : String(value));
+    formData.append(key, value instanceof File ? value : (typeof value === 'boolean' ? (value ? '1' : '0') : String(value)));
 };
 
 export const createProduct = async (productData) => {

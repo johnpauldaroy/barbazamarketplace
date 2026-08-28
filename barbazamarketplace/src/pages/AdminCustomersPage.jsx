@@ -219,8 +219,10 @@ const AdminCustomersPage = () => {
     try {
       await deleteAdminUser(deletingUser.id);
       toast({
-        title: 'User deleted',
-        description: `${deletingUser.name} has been removed.`,
+        title: deletingUser.is_merchant ? 'Merchant account deleted' : 'User deleted',
+        description: deletingUser.is_merchant
+          ? `${deletingUser.name}'s sign-in account has been removed. The store and its records were preserved.`
+          : `${deletingUser.name} has been removed.`,
         variant: 'success',
       });
       setIsDeleteDialogOpen(false);
@@ -332,8 +334,8 @@ const AdminCustomersPage = () => {
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                             onClick={() => openDeleteDialog(user)}
-                            disabled={user.is_merchant}
-                            title={user.is_merchant ? 'Merchant accounts are managed from Stores' : 'Delete user'}
+                            aria-label={user.is_merchant ? `Delete merchant account ${user.name}` : `Delete user ${user.name}`}
+                            title={user.is_merchant ? 'Delete merchant account' : 'Delete user'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -438,10 +440,12 @@ const AdminCustomersPage = () => {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
+            <DialogTitle>{deletingUser?.is_merchant ? 'Delete Merchant Account' : 'Delete User'}</DialogTitle>
             <DialogDescription>
               {deletingUser
-                ? `Are you sure you want to delete "${deletingUser.name}"? This action cannot be undone.`
+                ? deletingUser.is_merchant
+                  ? `Delete "${deletingUser.name}"? Their sign-in account will be permanently removed. ${deletingUser.store?.name || 'Their store'}, its products, inventory, and order records will remain.`
+                  : `Are you sure you want to delete "${deletingUser.name}"? This action cannot be undone.`
                 : 'Are you sure you want to delete this user?'}
             </DialogDescription>
           </DialogHeader>
@@ -451,7 +455,7 @@ const AdminCustomersPage = () => {
               Cancel
             </Button>
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={isMutating}>
-              {isMutating ? 'Deleting...' : 'Delete User'}
+              {isMutating ? 'Deleting...' : deletingUser?.is_merchant ? 'Delete Merchant Account' : 'Delete User'}
             </Button>
           </DialogFooter>
         </DialogContent>

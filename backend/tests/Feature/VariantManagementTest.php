@@ -63,7 +63,7 @@ class VariantManagementTest extends TestCase
         $this->assertContains('sack', $codes);
     }
 
-    public function test_merchant_can_add_a_variant_to_own_product(): void
+    public function test_merchant_cannot_add_a_variant_to_own_product(): void
     {
         Sanctum::actingAs($this->merchant);
 
@@ -73,16 +73,8 @@ class VariantManagementTest extends TestCase
             'price' => 1300,
         ]);
 
-        $response->assertCreated();
-        $response->assertJsonPath('variant.available_quantity', 2);
-
-        $this->assertDatabaseHas('product_variants', [
-            'product_id' => $this->product->id,
-            'name' => '25kg Sack',
-        ]);
-
-        // Two active options flips the flag that drives the storefront picker.
-        $this->assertTrue((bool) $this->product->fresh()->has_variants);
+        $response->assertForbidden();
+        $this->assertDatabaseMissing('product_variants', ['product_id' => $this->product->id, 'name' => '25kg Sack']);
     }
 
     public function test_merchant_cannot_touch_another_stores_product(): void
@@ -99,7 +91,7 @@ class VariantManagementTest extends TestCase
             'name' => 'Bag',
             'base_unit_quantity' => 1,
             'price' => 70,
-        ])->assertNotFound();
+        ])->assertForbidden();
     }
 
     public function test_admin_can_manage_variants_on_any_product(): void
@@ -116,7 +108,7 @@ class VariantManagementTest extends TestCase
 
     public function test_duplicate_option_name_is_rejected(): void
     {
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $this->postJson("/api/products/{$this->product->id}/variants", [
             'name' => 'loose (1kg)',
@@ -127,7 +119,7 @@ class VariantManagementTest extends TestCase
 
     public function test_zero_or_negative_ratio_is_rejected(): void
     {
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $this->postJson("/api/products/{$this->product->id}/variants", [
             'name' => 'Broken',
@@ -141,7 +133,7 @@ class VariantManagementTest extends TestCase
         // Piece cannot be split, so half a piece is not a valid packaging ratio.
         $this->product->update(['base_unit_id' => Unit::defaultUnit()->id]);
 
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $this->postJson("/api/products/{$this->product->id}/variants", [
             'name' => 'Half',
@@ -152,7 +144,7 @@ class VariantManagementTest extends TestCase
 
     public function test_only_one_variant_stays_default(): void
     {
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $this->postJson("/api/products/{$this->product->id}/variants", [
             'name' => '25kg Sack',
@@ -171,7 +163,7 @@ class VariantManagementTest extends TestCase
 
     public function test_deactivating_the_default_moves_it_to_an_active_option(): void
     {
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $sack = ProductVariant::create([
             'product_id' => $this->product->id,
@@ -197,7 +189,7 @@ class VariantManagementTest extends TestCase
 
     public function test_last_remaining_option_cannot_be_deleted(): void
     {
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $only = ProductVariant::query()->where('product_id', $this->product->id)->firstOrFail();
 
@@ -228,7 +220,7 @@ class VariantManagementTest extends TestCase
             'price' => 1300,
         ]);
 
-        Sanctum::actingAs($this->merchant);
+        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
 
         $this->deleteJson("/api/products/{$this->product->id}/variants/{$sack->id}")->assertOk();
 
@@ -287,6 +279,6 @@ class VariantManagementTest extends TestCase
             'name' => 'Sneaky',
             'base_unit_quantity' => 1,
             'price' => 1,
-        ])->assertNotFound();
+        ])->assertForbidden();
     }
 }
