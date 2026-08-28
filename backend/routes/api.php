@@ -6,11 +6,13 @@ use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MerchantInquiryController;
 use App\Http\Controllers\MerchantProductController;
+use App\Http\Controllers\MerchantPaymentMethodController;
 use App\Http\Controllers\MerchantStoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\PaymentSubmissionController;
 use App\Http\Controllers\PublicStoreController;
 use App\Http\Controllers\StoreInquiryController;
 use Illuminate\Support\Facades\Route;
@@ -60,7 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', [AuthController::class, 'me']);
 
         Route::post('/orders', [OrderController::class, 'store']);
+        Route::post('/checkout/quote', [OrderController::class, 'quote']);
         Route::get('/orders', [OrderController::class, 'index']);
+        Route::post('/orders/{id}/payment-proof', [PaymentSubmissionController::class, 'store']);
+        Route::get('/orders/{orderId}/payment-proofs/{submissionId}', [PaymentSubmissionController::class, 'proof']);
         Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
         Route::get('/products/{id}/reviews/me', [ProductReviewController::class, 'me']);
         Route::post('/products/{id}/reviews', [ProductReviewController::class, 'upsert']);
@@ -96,8 +101,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('merchant')->group(function () {
             Route::get('/merchant/store', [MerchantStoreController::class, 'show']);
             Route::put('/merchant/store', [MerchantStoreController::class, 'update']);
+            Route::get('/merchant/payment-methods', [MerchantPaymentMethodController::class, 'index']);
+            Route::post('/merchant/payment-methods', [MerchantPaymentMethodController::class, 'store']);
+            Route::put('/merchant/payment-methods/{id}', [MerchantPaymentMethodController::class, 'update']);
+            Route::delete('/merchant/payment-methods/{id}', [MerchantPaymentMethodController::class, 'destroy']);
             Route::get('/merchant/orders', [OrderController::class, 'merchantIndex']);
             Route::patch('/merchant/orders/{id}/status', [OrderController::class, 'merchantUpdateStatus']);
+            Route::patch('/merchant/orders/{id}/payment', [PaymentSubmissionController::class, 'review']);
             Route::get('/merchant/products', [MerchantProductController::class, 'index']);
             Route::post('/merchant/products', [MerchantProductController::class, 'store']);
             Route::put('/merchant/products/{id}', [MerchantProductController::class, 'update']);

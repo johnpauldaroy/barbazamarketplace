@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class Store extends Model
@@ -30,6 +31,25 @@ class Store extends Model
         'facebook_url',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (Store $store) {
+            if (! Schema::hasTable('store_payment_methods')) {
+                return;
+            }
+
+            $store->paymentMethods()->firstOrCreate(
+                ['type' => 'cod', 'label' => 'Cash on Delivery'],
+                [
+                    'instructions' => 'Pay in cash when your order is delivered.',
+                    'is_enabled' => true,
+                    'requires_reference' => false,
+                    'requires_proof' => false,
+                ]
+            );
+        });
+    }
+
     public function users()
     {
         return $this->hasMany(User::class);
@@ -48,6 +68,11 @@ class Store extends Model
     public function inquiries()
     {
         return $this->hasMany(StoreInquiry::class);
+    }
+
+    public function paymentMethods()
+    {
+        return $this->hasMany(StorePaymentMethod::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function isActive(): bool

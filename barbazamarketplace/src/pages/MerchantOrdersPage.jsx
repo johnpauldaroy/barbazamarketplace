@@ -9,6 +9,7 @@ import { useToast } from '../components/ui/use-toast';
 import { fetchMerchantOrders, updateMerchantOrderStatus } from '../api/EcommerceApi';
 import { formatPeso } from '../lib/marketplace';
 import Pagination from '../components/ui/Pagination';
+import MerchantPaymentReview from '../components/MerchantPaymentReview';
 
 const PAGE_SIZE = 10;
 
@@ -429,6 +430,8 @@ const MerchantOrdersPage = () => {
                   <p className="mt-1 font-medium text-slate-800">{detailOrder.shipping_address || 'N/A'}</p>
                 </div>
               </div>
+
+              <MerchantPaymentReview order={detailOrder} onUpdated={loadOrders} />
 
               {detailOrder.has_other_store_items && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">

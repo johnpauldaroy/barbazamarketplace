@@ -11,6 +11,7 @@ import {
   Search,
   ShieldCheck,
   Truck,
+  Upload,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -19,8 +20,8 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useToast } from '../components/ui/use-toast';
-import { getUserOrders, updateUserPassword } from '../api/EcommerceApi';
-import { formatPeso } from '../lib/marketplace';
+import { getUserOrders, submitOrderPaymentProof, updateUserPassword } from '../api/EcommerceApi';
+import { formatPeso, resolveProductImage } from '../lib/marketplace';
 
 const ORDER_STATUS_FLOW = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 const ORDER_JOURNEY_STEPS = ['pending', 'processing', 'shipped', 'delivered'];
@@ -151,6 +152,8 @@ const AccountPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [paymentProofForm, setPaymentProofForm] = useState({ referenceNumber: '', proof: null });
+  const [submittingPaymentOrderId, setSubmittingPaymentOrderId] = useState(null);
   const [passwordForm, setPasswordForm] = useState({
     current_password: '',
     password: '',
@@ -222,6 +225,30 @@ const AccountPage = () => {
 
   const handlePasswordFieldChange = (field, value) => {
     setPasswordForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePaymentProofSubmit = async (event) => {
+    event.preventDefault();
+    if (!selectedOrder || !paymentProofForm.referenceNumber.trim() || !(paymentProofForm.proof instanceof File)) {
+      toast({ title: 'Payment details required', description: 'Enter a transaction reference and choose a proof image.', variant: 'destructive' });
+      return;
+    }
+    setSubmittingPaymentOrderId(selectedOrder.id);
+    try {
+      const response = await submitOrderPaymentProof(selectedOrder.id, paymentProofForm);
+      setOrders((current) => current.map((order) => order.id === selectedOrder.id ? {
+        ...order,
+        payment_status: 'under_review',
+        payment_reference: paymentProofForm.referenceNumber.trim(),
+        payment_submission: response?.payment_submission,
+      } : order));
+      setPaymentProofForm({ referenceNumber: '', proof: null });
+      toast({ title: 'Payment proof submitted', description: 'The merchant will verify the transfer.', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Unable to submit proof', description: error?.message, variant: 'destructive' });
+    } finally {
+      setSubmittingPaymentOrderId(null);
+    }
   };
 
   const handlePasswordSubmit = async (event) => {
@@ -536,6 +563,28 @@ const AccountPage = () => {
                           <p className="mt-1 font-semibold text-[#2954C8]">{formatPeso(selectedOrder.total_amount)}</p>
                         </div>
                       </div>
+
+                      {!['cod', 'cash_pickup'].includes(selectedOrder.payment_method) && ['unpaid', 'rejected'].includes(selectedOrder.payment_status || 'unpaid') && (
+                        <form onSubmit={handlePaymentProofSubmit} className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                          <p className="text-xs font-bold uppercase tracking-wider text-[#2954C8]">Complete payment</p>
+                          <p className="mt-1 text-sm text-slate-600">Send {formatPeso(selectedOrder.total_amount)} using the merchant details from checkout, then submit your proof.</p>
+                          {selectedOrder.payment_status === 'rejected' && selectedOrder.payment_submission?.rejection_reason && <p className="mt-2 rounded-lg bg-red-50 p-2 text-sm text-red-700">Previous proof rejected: {selectedOrder.payment_submission.rejection_reason}</p>}
+                          <div className="mt-3 grid gap-3 sm:grid-cols-[96px_1fr]">
+                            {selectedOrder.payment_details?.qr_image_url && <img src={resolveProductImage(selectedOrder.payment_details.qr_image_url)} alt="Merchant payment QR" className="h-24 w-24 rounded-lg border border-slate-200 bg-white object-contain p-1" />}
+                            <div className="space-y-1 text-sm text-slate-700">
+                              {selectedOrder.payment_details?.account_name && <p><span className="text-slate-500">Account:</span> {selectedOrder.payment_details.account_name}</p>}
+                              {selectedOrder.payment_details?.provider && <p><span className="text-slate-500">Provider:</span> {selectedOrder.payment_details.provider}</p>}
+                              {selectedOrder.payment_details?.account_identifier && <p><span className="text-slate-500">Number:</span> {selectedOrder.payment_details.account_identifier}</p>}
+                              {selectedOrder.payment_details?.instructions && <p className="pt-1 text-slate-600">{selectedOrder.payment_details.instructions}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <Input value={paymentProofForm.referenceNumber} onChange={(event) => setPaymentProofForm((current) => ({ ...current, referenceNumber: event.target.value }))} placeholder="Transaction reference" className="min-h-11 bg-white text-base" />
+                            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPaymentProofForm((current) => ({ ...current, proof: event.target.files?.[0] || null }))} className="min-h-11 rounded-lg border border-slate-200 bg-white p-2 text-sm" />
+                          </div>
+                          <Button type="submit" disabled={submittingPaymentOrderId === selectedOrder.id} className="mt-3 min-h-11 gap-2 bg-[#2954C8]"><Upload className="h-4 w-4" />{submittingPaymentOrderId === selectedOrder.id ? 'Submitting…' : 'Submit proof for review'}</Button>
+                        </form>
+                      )}
 
                       <div className="rounded-2xl border border-slate-200 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Items</p>

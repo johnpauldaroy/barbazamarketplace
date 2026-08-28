@@ -203,6 +203,34 @@ export const createOrder = async (orderData) => {
     }
 };
 
+export const fetchCheckoutQuote = async (items) => {
+    return apiRequest('/checkout/quote', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+    });
+};
+
+export const submitOrderPaymentProof = async (orderId, { referenceNumber, proof }) => {
+    const formData = new FormData();
+    formData.append('reference_number', referenceNumber);
+    formData.append('proof', proof);
+    return apiRequest(`/orders/${orderId}/payment-proof`, {
+        method: 'POST',
+        body: formData,
+    });
+};
+
+export const openOrderPaymentProof = async (orderId, submissionId) => {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`${API_BASE_URL}/orders/${orderId}/payment-proofs/${submissionId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Unable to open payment proof.');
+    const url = URL.createObjectURL(await response.blob());
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
 export const getUserOrders = async () => {
     const data = await apiRequest('/orders');
     return data?.orders || [];
@@ -493,6 +521,46 @@ export const updateAdminMerchant = async (userId, payload) => {
 // Merchant portal APIs
 export const fetchMerchantStore = async () => {
     return apiRequest('/merchant/store');
+};
+
+export const fetchMerchantPaymentMethods = async () => {
+    return apiRequest('/merchant/payment-methods');
+};
+
+const paymentMethodFormData = (payload) => {
+    const formData = new FormData();
+    Object.entries(payload || {}).forEach(([key, value]) => {
+        if (value === null || value === undefined) return;
+        formData.append(key, value instanceof File ? value : String(value));
+    });
+    return formData;
+};
+
+export const createMerchantPaymentMethod = async (payload) => {
+    return apiRequest('/merchant/payment-methods', {
+        method: 'POST',
+        body: paymentMethodFormData(payload),
+    });
+};
+
+export const updateMerchantPaymentMethod = async (id, payload) => {
+    const formData = paymentMethodFormData(payload);
+    formData.append('_method', 'PUT');
+    return apiRequest(`/merchant/payment-methods/${id}`, {
+        method: 'POST',
+        body: formData,
+    });
+};
+
+export const deleteMerchantPaymentMethod = async (id) => {
+    return apiRequest(`/merchant/payment-methods/${id}`, { method: 'DELETE' });
+};
+
+export const reviewMerchantOrderPayment = async (orderId, action, rejectionReason = '') => {
+    return apiRequest(`/merchant/orders/${orderId}/payment`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action, rejection_reason: rejectionReason || undefined }),
+    });
 };
 
 export const updateMerchantStore = async (payload) => {

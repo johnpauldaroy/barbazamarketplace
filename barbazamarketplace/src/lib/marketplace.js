@@ -24,6 +24,9 @@ export const buildSimpleCartItem = (product) => ({
     title: product.title || product.name,
     thumbnail_url: resolveProductImage(product.image),
     description: product.description,
+    store_id: product.store_id || product.store?.id || null,
+    store_name: product.store?.name || 'Store',
+    store_slug: product.store?.slug || null,
   },
   variant: {
     id: product.id,
