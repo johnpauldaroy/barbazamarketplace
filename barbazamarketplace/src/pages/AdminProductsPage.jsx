@@ -661,13 +661,21 @@ const AdminProductsPage = () => {
               />
             </div>
 
-            {/* Variants only make sense once the product exists and has an id. */}
-            {editingProduct?.id && (
+            {/* Variants attach to a product id, so they are set up after saving. */}
+            {editingProduct?.id ? (
               <ProductVariantsEditor
                 productId={editingProduct.id}
                 baseUnitCode={editingProduct.base_unit?.code || 'pc'}
                 stock={editingProduct.stock}
               />
+            ) : (
+              <div className="rounded-lg border border-dashed border-[#dfe7f4] bg-[#f8fafd] p-3">
+                <p className="text-xs font-semibold text-[#0b1739]">Selling by pack, sack or piece?</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Create the product first, then reopen it to add options like &ldquo;5kg Pack&rdquo; or
+                  &ldquo;25kg Sack&rdquo;. They all share the stock you set above.
+                </p>
+              </div>
             )}
 
             <DialogFooter>
