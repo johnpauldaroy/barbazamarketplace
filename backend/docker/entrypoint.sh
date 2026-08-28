@@ -44,6 +44,9 @@ if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
     echo "Fresh database detected — seeding initial data..."
     php artisan db:seed --force
   fi
+  # Products created before variants shipped (or imported since) can still have
+  # no selling option, which leaves them unsellable. Safe to re-run.
+  php artisan products:backfill-variants
 else
   echo "Skipping migrations (RUN_MIGRATIONS=0)"
 fi
