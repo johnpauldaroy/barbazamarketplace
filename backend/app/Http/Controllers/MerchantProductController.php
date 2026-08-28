@@ -191,8 +191,10 @@ class MerchantProductController extends Controller
             ], 422);
         }
 
+        // Match against global (platform) categories too, so a merchant cannot
+        // create a private duplicate that shadows an admin-defined category.
         $existingCategory = Category::query()
-            ->where('store_id', $storeId)
+            ->visibleToStore($storeId)
             ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
             ->first();
 
@@ -211,9 +213,11 @@ class MerchantProductController extends Controller
 
     protected function getCategoryCollection(int $storeId)
     {
+        // Platform-store categories are global: admin defines them once and every
+        // store inherits them, alongside its own private categories.
         $storedCategories = Category::query()
             ->select('name')
-            ->where('store_id', $storeId)
+            ->visibleToStore($storeId)
             ->whereNotNull('name')
             ->where('name', '!=', '')
             ->pluck('name');
@@ -244,7 +248,7 @@ class MerchantProductController extends Controller
         }
 
         $exists = Category::query()
-            ->where('store_id', $storeId)
+            ->visibleToStore($storeId)
             ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
             ->exists();
 

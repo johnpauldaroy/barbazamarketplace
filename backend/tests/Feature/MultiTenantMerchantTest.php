@@ -199,6 +199,107 @@ class MultiTenantMerchantTest extends TestCase
         $this->assertDatabaseHas('categories', ['store_id' => $storeB->id, 'name' => 'Beverages']);
     }
 
+    public function test_admin_category_is_available_to_every_store(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $storeA = Store::create(['name' => 'Global Store A', 'slug' => 'global-store-a', 'status' => 'active']);
+        $storeB = Store::create(['name' => 'Global Store B', 'slug' => 'global-store-b', 'status' => 'active']);
+
+        $merchantA = User::factory()->create(['is_merchant' => true, 'store_id' => $storeA->id]);
+        $merchantB = User::factory()->create(['is_merchant' => true, 'store_id' => $storeB->id]);
+
+        // Admin defines a category with no store_id -> global.
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/categories', ['name' => 'Handicrafts'])->assertCreated();
+
+        // It is stored once, on the platform store.
+        $this->assertDatabaseHas('categories', [
+            'store_id' => Store::ensurePlatformStore()->id,
+            'name' => 'Handicrafts',
+        ]);
+        $this->assertDatabaseMissing('categories', ['store_id' => $storeA->id, 'name' => 'Handicrafts']);
+
+        // Yet every merchant sees it.
+        Sanctum::actingAs($merchantA);
+        $this->getJson('/api/merchant/categories')
+            ->assertOk()
+            ->assertJsonFragment(['Handicrafts']);
+
+        Sanctum::actingAs($merchantB);
+        $this->getJson('/api/merchant/categories')
+            ->assertOk()
+            ->assertJsonFragment(['Handicrafts']);
+    }
+
+    public function test_admin_category_reaches_stores_created_afterwards(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/categories', ['name' => 'Preserves'])->assertCreated();
+
+        // Store created *after* the category already exists.
+        $lateStore = Store::create(['name' => 'Late Store', 'slug' => 'late-store', 'status' => 'active']);
+        $lateMerchant = User::factory()->create(['is_merchant' => true, 'store_id' => $lateStore->id]);
+
+        Sanctum::actingAs($lateMerchant);
+        $this->getJson('/api/merchant/categories')
+            ->assertOk()
+            ->assertJsonFragment(['Preserves']);
+    }
+
+    public function test_admin_rename_of_global_category_propagates_to_stores(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::create(['name' => 'Prop Store', 'slug' => 'prop-store', 'status' => 'active']);
+        $merchant = User::factory()->create(['is_merchant' => true, 'store_id' => $store->id]);
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/categories', ['name' => 'Snack Foods'])->assertCreated();
+        $this->putJson('/api/categories/Snack Foods', ['name' => 'Snacks'])->assertOk();
+
+        Sanctum::actingAs($merchant);
+        $response = $this->getJson('/api/merchant/categories')->assertOk();
+        $response->assertJsonFragment(['Snacks']);
+        $this->assertNotContains('Snack Foods', $response->json('categories'));
+    }
+
+    public function test_merchant_still_has_private_categories_not_shared_with_others(): void
+    {
+        $storeA = Store::create(['name' => 'Private A', 'slug' => 'private-a', 'status' => 'active']);
+        $storeB = Store::create(['name' => 'Private B', 'slug' => 'private-b', 'status' => 'active']);
+        $merchantA = User::factory()->create(['is_merchant' => true, 'store_id' => $storeA->id]);
+        $merchantB = User::factory()->create(['is_merchant' => true, 'store_id' => $storeB->id]);
+
+        Sanctum::actingAs($merchantA);
+        $this->postJson('/api/merchant/categories', ['name' => 'A Only'])->assertCreated();
+
+        Sanctum::actingAs($merchantB);
+        $response = $this->getJson('/api/merchant/categories')->assertOk();
+        $this->assertNotContains('A Only', $response->json('categories'));
+    }
+
+    public function test_merchant_cannot_duplicate_an_existing_global_category(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $store = Store::create(['name' => 'Dup Store', 'slug' => 'dup-store', 'status' => 'active']);
+        $merchant = User::factory()->create(['is_merchant' => true, 'store_id' => $store->id]);
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/categories', ['name' => 'Beverages'])->assertCreated();
+
+        // Re-adding the same name (any casing) must not create a private shadow row.
+        Sanctum::actingAs($merchant);
+        $this->postJson('/api/merchant/categories', ['name' => 'beverages'])->assertOk();
+
+        $this->assertDatabaseMissing('categories', ['store_id' => $store->id, 'name' => 'beverages']);
+        $this->assertSame(
+            1,
+            Category::query()->whereRaw('LOWER(name) = ?', ['beverages'])->count()
+        );
+    }
+
     public function test_admin_can_rename_platform_category_and_products(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

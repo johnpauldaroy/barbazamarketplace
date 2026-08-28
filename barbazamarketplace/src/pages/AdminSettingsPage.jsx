@@ -321,7 +321,7 @@ const AdminSettingsPage = () => {
                 <Tags className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg">Category</CardTitle>
               </div>
-              <CardDescription>Create and manage category names for products.</CardDescription>
+              <CardDescription>Create and manage category names for products. Categories you add here apply to all stores and appear in every merchant's category list.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCreateCategory}>

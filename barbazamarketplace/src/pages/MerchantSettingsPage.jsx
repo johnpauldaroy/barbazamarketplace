@@ -390,7 +390,7 @@ const MerchantSettingsPage = () => {
                 <Tags className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg">Categories</CardTitle>
               </div>
-              <CardDescription>Create and manage category names for your products.</CardDescription>
+              <CardDescription>Categories set by the administrator apply to every store and appear here automatically. You can add your own on top of those.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleCreateCategory}>
@@ -408,6 +408,7 @@ const MerchantSettingsPage = () => {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Available Categories</p>
+                <p className="mt-1 text-[11px] text-slate-400">Includes store-wide categories from the administrator.</p>
                 {isLoadingCategories ? (
                   <p className="mt-2 text-xs text-slate-400">Loading categories...</p>
                 ) : sortedCategories.length === 0 ? (

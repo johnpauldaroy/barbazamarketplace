@@ -118,6 +118,8 @@ class ProductController extends Controller
             ], 422);
         }
 
+        // No store_id means an admin is defining a global category: it lives on the
+        // platform store and every store inherits it via Category::visibleToStore().
         $storeId = isset($validated['store_id'])
             ? (int) $validated['store_id']
             : Store::ensurePlatformStore()->id;
@@ -378,11 +380,14 @@ class ProductController extends Controller
 
     protected function getCategoryCollection(?int $storeId = null)
     {
+        // Platform-store categories are global. When scoped to a store we return
+        // that store's own categories plus the global ones; unscoped (admin
+        // browsing everything) we return every category.
         $storedCategories = Category::query()
             ->select('name')
             ->whereNotNull('name')
             ->where('name', '!=', '')
-            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->when($storeId, fn ($query) => $query->visibleToStore($storeId))
             ->pluck('name');
 
         $productCategories = Product::query()

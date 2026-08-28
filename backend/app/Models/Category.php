@@ -29,4 +29,24 @@ class Category extends Model
     {
         return $this->belongsTo(Store::class);
     }
+
+    /**
+     * Categories owned by the platform store are global: admins define them once
+     * and every store inherits them, on top of its own private categories.
+     */
+    public function scopeVisibleToStore($query, ?int $storeId)
+    {
+        $platformStoreId = Store::ensurePlatformStore()->id;
+
+        if (!$storeId || $storeId === $platformStoreId) {
+            return $query->where('store_id', $platformStoreId);
+        }
+
+        return $query->whereIn('store_id', [$platformStoreId, $storeId]);
+    }
+
+    public function scopeGlobal($query)
+    {
+        return $query->where('store_id', Store::ensurePlatformStore()->id);
+    }
 }
