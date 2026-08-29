@@ -11,6 +11,7 @@ import { useToast } from '../components/ui/use-toast';
 import { createMerchantProduct, deleteMerchantProduct, fetchMerchantCategories, fetchMerchantProducts, updateMerchantProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
 import Pagination from '../components/ui/Pagination';
+import ProductThumbnail from '../components/ProductThumbnail';
 
 const PAGE_SIZE = 10;
 
@@ -264,15 +265,12 @@ const MerchantProductsPage = () => {
                     <tr key={product.id} className="transition-colors hover:bg-slate-50/80">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-slate-100 p-1">
-                            {product.displayImage ? (
-                              <img src={product.displayImage} alt={product.displayName} className="h-full w-full object-cover rounded-md" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center rounded-md bg-slate-200 text-[8px] text-slate-400">
-                                No img
-                              </div>
-                            )}
-                          </div>
+                          <ProductThumbnail
+                            src={product.displayImage}
+                            alt={product.displayName}
+                            className="h-10 w-10"
+                            imageClassName="rounded-md"
+                          />
                           <div>
                             <p className="text-sm font-bold text-slate-800">{product.displayName}</p>
                             <p className="text-[10px] text-slate-400">ID: {product.id}</p>
@@ -309,15 +307,12 @@ const MerchantProductsPage = () => {
             ) : (
               pagedProducts.map((product) => (
                 <div key={product.id} className="flex gap-3 rounded-2xl border border-[#ECF1FA] bg-white p-3 shadow-sm">
-                  <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-slate-100 p-1">
-                    {product.displayImage ? (
-                      <img src={product.displayImage} alt={product.displayName} className="h-full w-full rounded-md object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-md bg-slate-200 text-[8px] text-slate-400">
-                        No img
-                      </div>
-                    )}
-                  </div>
+                  <ProductThumbnail
+                    src={product.displayImage}
+                    alt={product.displayName}
+                    className="h-14 w-14"
+                    imageClassName="rounded-md"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
