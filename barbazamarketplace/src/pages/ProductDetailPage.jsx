@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Loader2,
   Minus,
-  Package,
   Plus,
   ShoppingCart,
   Star,
@@ -24,6 +23,7 @@ import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/use-toast';
 import { buildCartItem, getAvailableQuantity, getDefaultVariant, getProductVariants, resolveProductImage } from '../lib/marketplace';
+import ProductImageCarousel from '../components/ProductImageCarousel';
 
 const defaultSummary = { average_rating: 0, ratings_count: 0, breakdown: [] };
 
@@ -262,6 +262,11 @@ const ProductDetailPage = () => {
   // What the shopper can actually buy of the selected unit.
   const stock = availableQuantity;
   const imageUrl = resolveProductImage(product.image_url || product.image);
+  // Older products (and the OG/schema tags below) only ever had one photo, so
+  // fall back to it when the gallery is empty rather than showing a blank.
+  const galleryImages = product.images?.length > 0
+    ? product.images.map((image) => resolveProductImage(image.url)).filter(Boolean)
+    : [imageUrl].filter(Boolean);
 
   return (
     <>
@@ -320,19 +325,7 @@ const ProductDetailPage = () => {
         {/* Product section */}
         <div className="grid gap-8 lg:grid-cols-[1fr_480px] xl:grid-cols-[1fr_520px]">
           {/* Image */}
-          <div className="overflow-hidden rounded-xl border border-[#dfe7f4] bg-[#f4f7fd]">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={product.title || product.name}
-                className="h-full max-h-[520px] w-full object-contain p-4"
-              />
-            ) : (
-              <div className="flex min-h-[340px] items-center justify-center text-slate-400">
-                <Package className="h-12 w-12 opacity-40" />
-              </div>
-            )}
-          </div>
+          <ProductImageCarousel images={galleryImages} alt={product.title || product.name} />
 
           {/* Details */}
           <div className="space-y-5">

@@ -9,11 +9,11 @@ import {
   Phone,
   Search,
   SlidersHorizontal,
-  Store,
   X,
 } from 'lucide-react';
 import { fetchProducts, fetchStoreBySlug, submitStoreInquiry } from '../api/EcommerceApi';
 import ProductCard from '../components/ProductCard';
+import StoreLogo from '../components/StoreLogo';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../hooks/useCart';
 import { Badge } from '../components/ui/badge';
@@ -306,13 +306,12 @@ const StoreDetailPage = () => {
           <div className="w-full rounded-[28px] border border-white/20 bg-black/20 p-6 backdrop-blur-[2px] sm:p-8">
             <Badge className="border border-white/20 bg-white/10 text-white">Storefront</Badge>
             <div className="mt-5 flex flex-wrap items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/20">
-                {store?.logo_image ? (
-                  <img src={store.logo_image} alt={`${store.name} logo`} className="h-full w-full object-cover" />
-                ) : (
-                  <Store className="h-7 w-7" />
-                )}
-              </div>
+              <StoreLogo
+                src={store?.logo_image}
+                name={store.name}
+                className="h-14 w-14 bg-white/20 text-white"
+                iconClassName="h-7 w-7"
+              />
               <div>
                 <h1 className="text-4xl font-bold sm:text-5xl">{store.name}</h1>
                 <p className="mt-1 text-sm text-white/90">{Number(store?.product_count || 0)} products listed</p>

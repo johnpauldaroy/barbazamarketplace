@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Loader2, MapPin, Search, Store } from 'lucide-react';
+import { Loader2, MapPin, Search } from 'lucide-react';
 import { fetchStores } from '../api/EcommerceApi';
+import StoreLogo from '../components/StoreLogo';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -152,11 +153,7 @@ const StoresPage = () => {
                   <Card key={store.id} className="overflow-hidden rounded-[28px]">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#eef5ff] text-[#2954C8]">
-                          {store.logo_image
-                            ? <img src={store.logo_image} alt={store.name} className="h-full w-full object-cover" />
-                            : <Store className="h-5 w-5" />}
-                        </div>
+                        <StoreLogo src={store.logo_image} name={store.name} className="h-11 w-11" />
                         <div>
                           <p className="text-lg font-semibold text-[#0b1739]">{store.name}</p>
                           <p className="text-xs text-slate-400">{store.slug}</p>
