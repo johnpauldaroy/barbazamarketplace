@@ -31,7 +31,9 @@ class VariantBackfillTest extends TestCase
      */
     public function test_existing_products_are_backfilled_with_a_default_variant(): void
     {
-        Artisan::call('migrate:rollback', ['--step' => 6]);
+        // Step count = the 6 unit/variant migrations plus every migration
+        // added above them since (currently 1: create_product_images_table).
+        Artisan::call('migrate:rollback', ['--step' => 7]);
 
         $this->assertFalse(DB::getSchemaBuilder()->hasTable('product_variants'));
 
@@ -137,7 +139,9 @@ class VariantBackfillTest extends TestCase
 
     public function test_product_without_category_gets_named_default_variant(): void
     {
-        Artisan::call('migrate:rollback', ['--step' => 6]);
+        // Step count = the 6 unit/variant migrations plus every migration
+        // added above them since (currently 1: create_product_images_table).
+        Artisan::call('migrate:rollback', ['--step' => 7]);
 
         $productId = DB::table('products')->insertGetId([
             'store_id' => Store::ensurePlatformStore()->id,
@@ -158,7 +162,9 @@ class VariantBackfillTest extends TestCase
 
     public function test_migrations_are_reversible(): void
     {
-        Artisan::call('migrate:rollback', ['--step' => 6]);
+        // Step count = the 6 unit/variant migrations plus every migration
+        // added above them since (currently 1: create_product_images_table).
+        Artisan::call('migrate:rollback', ['--step' => 7]);
 
         $this->assertFalse(DB::getSchemaBuilder()->hasTable('product_variants'));
         $this->assertFalse(DB::getSchemaBuilder()->hasTable('units'));

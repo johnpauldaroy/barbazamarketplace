@@ -113,7 +113,7 @@ class MultiTenantMerchantTest extends TestCase
         $this->getJson('/api/merchant/store')->assertForbidden();
     }
 
-    public function test_merchant_product_management_is_view_only(): void
+    public function test_merchant_can_create_and_update_products_only_for_their_store(): void
     {
         $storeA = Store::create([
             'name' => 'Store A',
@@ -145,14 +145,38 @@ class MultiTenantMerchantTest extends TestCase
             'category' => 'Snacks',
             'stock' => 12,
         ]);
-        $createResponse->assertForbidden();
+        $createResponse->assertCreated();
+        $productId = $createResponse->json('product.id');
+        $this->assertDatabaseHas('products', [
+            'id' => $productId,
+            'store_id' => $storeA->id,
+            'title' => 'Store A Product',
+        ]);
+        $this->assertDatabaseHas('product_variants', [
+            'product_id' => $productId,
+            'price' => 100,
+            'is_default' => true,
+        ]);
 
-        $productId = Product::create(['store_id' => $storeA->id, 'title' => 'Admin Product', 'price' => 100, 'category' => 'Snacks', 'stock' => 12])->id;
+        $this->putJson("/api/merchant/products/{$productId}", [
+            'title' => 'Store A Product Updated',
+            'price' => 125,
+            'stock' => 20,
+        ])->assertOk()
+            ->assertJsonPath('product.title', 'Store A Product Updated')
+            ->assertJsonPath('product.price', 125);
+
+        $this->assertDatabaseHas('products', [
+            'id' => $productId,
+            'store_id' => $storeA->id,
+            'title' => 'Store A Product Updated',
+            'stock' => 20,
+        ]);
 
         Sanctum::actingAs($merchantB);
         $this->putJson("/api/merchant/products/{$productId}", [
             'title' => 'Hacked title',
-        ])->assertForbidden();
+        ])->assertNotFound();
 
         $this->deleteJson("/api/merchant/products/{$productId}")->assertForbidden();
     }

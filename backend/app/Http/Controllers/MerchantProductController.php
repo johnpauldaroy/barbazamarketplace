@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Unit;
+use App\Services\InventoryService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MerchantProductController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -29,7 +34,7 @@ class MerchantProductController extends Controller
         $sort = $validated['sort'] ?? 'name';
 
         $products = $this->applyVisibleReviewSummary(
-            Product::query()->with(['store', 'baseUnit', 'variants'])
+            Product::query()->with(['store', 'baseUnit', 'variants', 'images'])
         )
             ->where('store_id', $storeId)
             ->when($search !== '', function ($query) use ($search) {
@@ -79,32 +84,63 @@ class MerchantProductController extends Controller
 
     public function store(Request $request)
     {
-        abort(403, 'Product management is restricted to administrators.');
-
         $storeId = (int) $request->user()->store_id;
 
-        $request->validate([
+        $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'category' => 'required|string|max:100',
-            'image' => 'nullable',
-            'stock' => 'required|integer|min:0',
-            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000',
+            'image' => 'nullable|image|max:5120',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'image|max:5120',
+            'stock' => 'required|numeric|min:0|max:999999999.999',
+            'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999',
         ]);
 
-        $data = $request->except('image');
-        $data['store_id'] = $storeId;
+        $unit = Unit::defaultUnit();
+        $stock = (float) $validated['stock'];
+        $threshold = (float) ($validated['low_stock_threshold'] ?? 10);
+        $this->inventory->assertQuantityForUnit($stock, $unit, 'stock', true);
+        $this->inventory->assertQuantityForUnit($threshold, $unit, 'low_stock_threshold', true);
 
+        $imagePath = null;
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('products', 'public');
-            $data['image'] = $imagePath;
-        } elseif (is_string($request->image) && $request->image !== '') {
-            $data['image'] = $request->image;
         }
 
-        $this->ensureCategoryExists($data['category'] ?? null, $storeId);
-        $product = Product::create($data)->load('store');
+        $galleryPaths = array_map(
+            fn ($file) => $file->store('products', 'public'),
+            $request->file('images', [])
+        );
+        if (! $imagePath && $galleryPaths) {
+            $imagePath = $galleryPaths[0];
+        }
+
+        $category = trim($validated['category']);
+        $this->ensureCategoryExists($category, $storeId);
+        $product = DB::transaction(function () use ($validated, $storeId, $unit, $stock, $threshold, $category, $imagePath, $galleryPaths, $request) {
+            $product = Product::create([
+                'store_id' => $storeId,
+                'title' => trim($validated['title']),
+                'description' => $validated['description'] ?? null,
+                'price' => (float) $validated['price'],
+                'category' => $category,
+                'image' => $imagePath,
+                'stock' => 0,
+                'low_stock_threshold' => $threshold,
+                'base_unit_id' => $unit->id,
+                'has_variants' => false,
+            ]);
+            $product->ensureDefaultVariant();
+            foreach ($galleryPaths as $index => $path) {
+                $product->images()->create(['path' => $path, 'sort_order' => $index]);
+            }
+            $this->inventory->movement($product, $stock, 'opening', $request->user()->id, null, 'Merchant opening inventory');
+
+            return $product;
+        });
+        $product->load(['store', 'baseUnit', 'variants', 'images']);
 
         return response()->json([
             'message' => 'Product created successfully',
@@ -114,42 +150,98 @@ class MerchantProductController extends Controller
 
     public function update(Request $request, int $id)
     {
-        abort(403, 'Product management is restricted to administrators.');
-
         $storeId = (int) $request->user()->store_id;
         $product = Product::query()
+            ->with('baseUnit')
             ->where('store_id', $storeId)
             ->findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric|min:0',
             'category' => 'sometimes|required|string|max:100',
-            'image' => 'nullable',
-            'stock' => 'sometimes|required|integer|min:0',
-            'low_stock_threshold' => 'sometimes|nullable|integer|min:0|max:100000',
+            'image' => 'nullable|image|max:5120',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'image|max:5120',
+            'remove_image_ids' => 'nullable|array',
+            'remove_image_ids.*' => 'integer|exists:product_images,id',
+            'stock' => 'sometimes|required|numeric|min:0|max:999999999.999',
+            'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999',
         ]);
 
-        $data = $request->except('image');
-        $data['store_id'] = $storeId;
-
-        if ($request->hasFile('image')) {
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
-            $imagePath = $request->file('image')->store('products', 'public');
-            $data['image'] = $imagePath;
-        } elseif (is_string($request->image) && $request->image !== '') {
-            $data['image'] = $request->image;
+        $data = collect($validated)->except(['image', 'images', 'remove_image_ids', 'stock'])->all();
+        if (array_key_exists('title', $data)) {
+            $data['title'] = trim($data['title']);
+        }
+        if (array_key_exists('category', $data)) {
+            $data['category'] = trim($data['category']);
+        }
+        if (array_key_exists('low_stock_threshold', $data)) {
+            $this->inventory->assertQuantityForUnit((float) $data['low_stock_threshold'], $product->baseUnit, 'low_stock_threshold', true);
         }
 
+        $oldImage = $product->image;
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('products', 'public');
+        }
+
+        // Merchant products only ever belong to that merchant's own store, so
+        // scoping the removal ids to this product is enough to prevent a
+        // cross-store id from deleting someone else's gallery row.
+        $removeIds = collect($validated['remove_image_ids'] ?? [])->map(fn ($id) => (int) $id);
+        $removedImages = $removeIds->isNotEmpty()
+            ? $product->images()->whereIn('id', $removeIds)->get()
+            : collect();
+        $galleryPaths = array_map(
+            fn ($file) => $file->store('products', 'public'),
+            $request->file('images', [])
+        );
+
         $this->ensureCategoryExists($data['category'] ?? $product->category, $storeId);
-        $product->update($data);
+        DB::transaction(function () use ($validated, $data, $product, $request) {
+            if (array_key_exists('stock', $validated) && (float) $validated['stock'] !== (float) $product->stock) {
+                $this->inventory->adjust($product, 'set', (float) $validated['stock'], $request->user()->id, 'Merchant product update');
+            }
+            if (array_key_exists('price', $data)) {
+                $product->ensureDefaultVariant()->update(['price' => $data['price']]);
+            }
+            $product->update($data);
+        });
+
+        if ($removedImages->isNotEmpty()) {
+            $product->images()->whereIn('id', $removedImages->pluck('id'))->delete();
+        }
+        if ($galleryPaths) {
+            $nextSortOrder = (int) $product->images()->max('sort_order') + 1;
+            foreach ($galleryPaths as $index => $path) {
+                $product->images()->create(['path' => $path, 'sort_order' => $nextSortOrder + $index]);
+            }
+        }
+
+        if (array_key_exists('image', $data) && $oldImage && $oldImage !== $data['image']) {
+            Storage::disk('public')->delete($oldImage);
+        }
+
+        // Keep the single `image` column (every existing thumbnail call site)
+        // pointed at the first gallery entry once one exists, so removing the
+        // current primary doesn't leave it referencing a deleted file.
+        if (! $request->hasFile('image') && ! array_key_exists('image', $data)) {
+            $primary = $product->images()->first();
+            if ($primary && $product->image !== $primary->path) {
+                $product->update(['image' => $primary->path]);
+            } elseif (! $primary && $removedImages->isNotEmpty()) {
+                $product->update(['image' => null]);
+            }
+        }
+
+        foreach ($removedImages as $removedImage) {
+            Storage::disk('public')->delete($removedImage->path);
+        }
 
         return response()->json([
             'message' => 'Product updated successfully',
-            'product' => $this->formatProduct($product->fresh()->load('store')),
+            'product' => $this->formatProduct($product->fresh()->load(['store', 'baseUnit', 'variants', 'images'])),
         ]);
     }
 
@@ -287,6 +379,18 @@ class MerchantProductController extends Controller
             ]);
     }
 
+    protected function formatImages(Product $product): array
+    {
+        $images = $product->relationLoaded('images')
+            ? $product->images
+            : $product->images()->get();
+
+        return $images->map(fn (\App\Models\ProductImage $image) => [
+            'id' => $image->id,
+            'url' => $image->url,
+        ])->values()->all();
+    }
+
     protected function formatProduct(Product $product): array
     {
         $store = $product->store;
@@ -308,6 +412,7 @@ class MerchantProductController extends Controller
             'category_slug' => Str::slug($product->category ?? 'general'),
             'image' => $product->image,
             'image_url' => $product->image_url,
+            'images' => $this->formatImages($product),
             'stock' => (float) $product->stock,
             'base_unit' => $product->baseUnit ? [
                 'id' => $product->baseUnit->id,

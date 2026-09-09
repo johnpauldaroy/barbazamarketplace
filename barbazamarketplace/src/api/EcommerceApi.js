@@ -611,7 +611,7 @@ export const createMerchantProduct = async (productData) => {
             if (key === 'image' && productData[key] instanceof File) {
                 formData.append('image', productData[key]);
             } else if (productData[key] !== null && productData[key] !== undefined) {
-                formData.append(key, productData[key]);
+                appendFormValue(formData, key, productData[key]);
             }
         });
         return await apiRequest('/merchant/products', {
@@ -631,7 +631,7 @@ export const updateMerchantProduct = async (id, productData) => {
             if (key === 'image' && productData[key] instanceof File) {
                 formData.append('image', productData[key]);
             } else if (productData[key] !== null && productData[key] !== undefined) {
-                formData.append(key, productData[key]);
+                appendFormValue(formData, key, productData[key]);
             }
         });
         formData.append('_method', 'PUT');

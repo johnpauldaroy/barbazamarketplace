@@ -11,6 +11,7 @@ import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import ProductOptionsDraftEditor from '../components/ProductOptionsDraftEditor';
 import InventoryManager from '../components/InventoryManager';
 import ProductThumbnail from '../components/ProductThumbnail';
+import MultiImageUploader from '../components/MultiImageUploader';
 import { useToast } from '../components/ui/use-toast';
 import { bulkImportProducts, createProduct, deleteProduct, fetchAdminStores, fetchProducts, fetchUnits, getCategories, updateProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
@@ -26,7 +27,9 @@ const INITIAL_FORM = {
   stock: '',
   stockThreshold: '10',
   description: '',
-  imageFile: null,
+  existingImages: [],
+  newImageFiles: [],
+  removeImageIds: [],
   baseUnitId: '',
   variants: [{ name: 'Per piece', base_unit_quantity: '1', price: '', is_default: true }],
 };
@@ -39,6 +42,9 @@ const normalizeProduct = (product) => ({
   displayImage: resolveProductImage(product?.image_url || product?.image) || null,
   displayStock: Number(product?.stock ?? 0),
   displayThreshold: Number(product?.low_stock_threshold ?? 10),
+  images: Array.isArray(product?.images)
+    ? product.images.map((image) => ({ id: image.id, url: resolveProductImage(image.url) }))
+    : [],
 });
 
 const AdminProductsPage = () => {
@@ -200,7 +206,9 @@ const AdminProductsPage = () => {
       stock: product?.stock != null ? String(product.stock) : '',
       stockThreshold: product?.low_stock_threshold != null ? String(product.low_stock_threshold) : '10',
       description: product?.description || '',
-      imageFile: null,
+      existingImages: Array.isArray(product?.images) ? product.images : [],
+      newImageFiles: [],
+      removeImageIds: [],
       baseUnitId: product?.base_unit?.id != null ? String(product.base_unit.id) : '',
       variants: [],
     });
@@ -370,8 +378,11 @@ const AdminProductsPage = () => {
       }));
     }
 
-    if (form.imageFile) {
-      payload.image = form.imageFile;
+    if (form.newImageFiles.length > 0) {
+      payload.images = form.newImageFiles;
+    }
+    if (editingProduct && form.removeImageIds.length > 0) {
+      payload.remove_image_ids = form.removeImageIds;
     }
 
     setIsMutating(true);
@@ -685,12 +696,27 @@ const AdminProductsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="product-image">Image</Label>
-              <Input
-                id="product-image"
-                type="file"
-                accept="image/*"
-                onChange={(event) => updateFormField('imageFile', event.target.files?.[0] || null)}
+              <Label>Images</Label>
+              <MultiImageUploader
+                existingImages={form.existingImages}
+                newFiles={form.newImageFiles}
+                disabled={isMutating}
+                onAddFiles={(files) =>
+                  setForm((prev) => ({ ...prev, newImageFiles: [...prev.newImageFiles, ...files] }))
+                }
+                onRemoveExisting={(imageId) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    existingImages: prev.existingImages.filter((image) => image.id !== imageId),
+                    removeImageIds: [...prev.removeImageIds, imageId],
+                  }))
+                }
+                onRemoveNewFile={(index) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    newImageFiles: prev.newImageFiles.filter((_, fileIndex) => fileIndex !== index),
+                  }))
+                }
               />
             </div>
 

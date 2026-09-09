@@ -37,7 +37,7 @@ class ProductController extends Controller
         $sort = $validated['sort'] ?? 'name';
 
         $products = $this->applyVisibleReviewSummary(
-            Product::query()->with(['store', 'variants', 'baseUnit'])
+            Product::query()->with(['store', 'variants', 'baseUnit', 'images'])
         )
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nestedQuery) use ($search) {
@@ -88,7 +88,7 @@ class ProductController extends Controller
     public function show($id)
     {
         $product = $this->applyVisibleReviewSummary(
-            Product::query()->with(['store', 'variants', 'baseUnit'])
+            Product::query()->with(['store', 'variants', 'baseUnit', 'images'])
         )->findOrFail($id);
 
         return response()->json([
@@ -249,6 +249,8 @@ class ProductController extends Controller
             'store_id' => 'nullable|integer|exists:stores,id',
             'base_unit_id' => 'nullable|integer|exists:units,id',
             'image' => 'nullable',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'image|max:5120',
             'stock' => 'required|numeric|min:0|max:999999999.999',
             'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999',
             'variants' => 'nullable|array|min:1',
@@ -290,15 +292,23 @@ class ProductController extends Controller
         $defaultPrice = (float) $variants[$defaultIndex]['price'];
 
         $imagePath = null;
-        
+
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('products', 'public');
         } elseif (is_string($request->image) && $request->image !== '') {
             $imagePath = $request->image;
         }
 
+        $galleryPaths = array_map(
+            fn ($file) => $file->store('products', 'public'),
+            $request->file('images', [])
+        );
+        if (! $imagePath && $galleryPaths) {
+            $imagePath = $galleryPaths[0];
+        }
+
         $this->ensureCategoryExists($validated['category'], $storeId);
-        $product = DB::transaction(function () use ($validated, $storeId, $unit, $stock, $threshold, $variants, $defaultIndex, $defaultPrice, $imagePath, $request) {
+        $product = DB::transaction(function () use ($validated, $storeId, $unit, $stock, $threshold, $variants, $defaultIndex, $defaultPrice, $imagePath, $galleryPaths, $request) {
             $product = Product::create([
                 'store_id' => $storeId,
                 'title' => trim($validated['title']),
@@ -322,10 +332,13 @@ class ProductController extends Controller
                     'sort_order' => $index,
                 ]);
             }
+            foreach ($galleryPaths as $index => $path) {
+                $product->images()->create(['path' => $path, 'sort_order' => $index]);
+            }
             $this->inventory->movement($product, $stock, 'opening', $request->user()?->id, null, 'Opening inventory');
             return $product;
         });
-        $product->load(['store', 'baseUnit', 'variants']);
+        $product->load(['store', 'baseUnit', 'variants', 'images']);
 
         return response()->json([
             'message' => 'Product created successfully',
@@ -344,16 +357,20 @@ class ProductController extends Controller
             'category' => 'sometimes|required|string|max:100',
             'store_id' => 'nullable|integer|exists:stores,id',
             'image' => 'nullable',
+            'images' => 'nullable|array|max:8',
+            'images.*' => 'image|max:5120',
+            'remove_image_ids' => 'nullable|array',
+            'remove_image_ids.*' => 'integer|exists:product_images,id',
             'stock' => 'sometimes|required|numeric|min:0|max:999999999.999',
             'low_stock_threshold' => 'sometimes|nullable|numeric|min:0|max:999999999.999'
         ]);
 
-        $data = collect($validated)->except(['image', 'stock'])->all();
+        $data = collect($validated)->except(['image', 'images', 'remove_image_ids', 'stock'])->all();
         $targetStoreId = array_key_exists('store_id', $data)
             ? (int) $data['store_id']
             : (int) $product->store_id;
         $data['store_id'] = $targetStoreId;
-        
+
         if ($request->hasFile('image')) {
             // Delete old image if exists
             if ($product->image) {
@@ -364,6 +381,15 @@ class ProductController extends Controller
         } elseif (is_string($request->image) && $request->image !== '') {
             $data['image'] = $request->image;
         }
+
+        $removeIds = collect($validated['remove_image_ids'] ?? [])->map(fn ($id) => (int) $id);
+        $removedImages = $removeIds->isNotEmpty()
+            ? $product->images()->whereIn('id', $removeIds)->get()
+            : collect();
+        $galleryPaths = array_map(
+            fn ($file) => $file->store('products', 'public'),
+            $request->file('images', [])
+        );
 
         $this->ensureCategoryExists($data['category'] ?? $product->category, $targetStoreId);
         if (array_key_exists('low_stock_threshold', $data)) {
@@ -377,9 +403,36 @@ class ProductController extends Controller
         }
         $product->update($data);
 
+        if ($removedImages->isNotEmpty()) {
+            $product->images()->whereIn('id', $removedImages->pluck('id'))->delete();
+        }
+        if ($galleryPaths) {
+            $nextSortOrder = (int) $product->images()->max('sort_order') + 1;
+            foreach ($galleryPaths as $index => $path) {
+                $product->images()->create(['path' => $path, 'sort_order' => $nextSortOrder + $index]);
+            }
+        }
+
+        // The single `image` column still drives every existing thumbnail call
+        // site. Once a product has a gallery, keep it pointed at the first
+        // gallery entry so removing the current primary image doesn't leave it
+        // referencing a deleted file.
+        if (! $request->hasFile('image') && (! is_string($request->image) || $request->image === '')) {
+            $primary = $product->images()->first();
+            if ($primary && $product->image !== $primary->path) {
+                $product->update(['image' => $primary->path]);
+            } elseif (! $primary && $removedImages->isNotEmpty()) {
+                $product->update(['image' => null]);
+            }
+        }
+
+        foreach ($removedImages as $removedImage) {
+            Storage::disk('public')->delete($removedImage->path);
+        }
+
         return response()->json([
             'message' => 'Product updated successfully',
-            'product' => $this->formatProduct($product->fresh()->load('store')),
+            'product' => $this->formatProduct($product->fresh()->load(['store', 'images'])),
         ]);
     }
 
@@ -441,11 +494,14 @@ class ProductController extends Controller
 
     public function destroy($id)
     {
-        $product = Product::findOrFail($id);
-        
+        $product = Product::with('images')->findOrFail($id);
+
         // Delete image if exists
         if ($product->image) {
             Storage::disk('public')->delete($product->image);
+        }
+        foreach ($product->images as $image) {
+            Storage::disk('public')->delete($image->path);
         }
 
         $product->delete();
@@ -563,6 +619,7 @@ class ProductController extends Controller
             'category_slug' => Str::slug($product->category ?? 'general'),
             'image' => $product->image,
             'image_url' => $product->image_url,
+            'images' => $this->formatImages($product),
             // Stock counts base units and may be fractional for weight/volume.
             'stock' => (float) $product->stock,
             'base_unit' => $product->baseUnit ? [
@@ -589,6 +646,18 @@ class ProductController extends Controller
      * Active variants with their own price and how many of each the shared base
      * stock can currently cover.
      */
+    protected function formatImages(Product $product): array
+    {
+        $images = $product->relationLoaded('images')
+            ? $product->images
+            : $product->images()->get();
+
+        return $images->map(fn (\App\Models\ProductImage $image) => [
+            'id' => $image->id,
+            'url' => $image->url,
+        ])->values()->all();
+    }
+
     protected function formatVariants(Product $product): array
     {
         $variants = $product->relationLoaded('variants')

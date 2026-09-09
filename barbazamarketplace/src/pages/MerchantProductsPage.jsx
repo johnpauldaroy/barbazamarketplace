@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -8,10 +8,11 @@ import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/use-toast';
-import { createMerchantProduct, deleteMerchantProduct, fetchMerchantCategories, fetchMerchantProducts, updateMerchantProduct } from '../api/EcommerceApi';
+import { createMerchantProduct, fetchMerchantCategories, fetchMerchantProducts, updateMerchantProduct } from '../api/EcommerceApi';
 import { formatPeso as defaultFormatPeso, resolveProductImage } from '../lib/marketplace';
 import Pagination from '../components/ui/Pagination';
 import ProductThumbnail from '../components/ProductThumbnail';
+import MultiImageUploader from '../components/MultiImageUploader';
 
 const PAGE_SIZE = 10;
 
@@ -22,7 +23,9 @@ const INITIAL_FORM = {
   stock: '',
   lowStockThreshold: '10',
   description: '',
-  imageFile: null,
+  existingImages: [],
+  newImageFiles: [],
+  removeImageIds: [],
 };
 
 const normalizeProduct = (product) => ({
@@ -32,6 +35,9 @@ const normalizeProduct = (product) => ({
   displayAmount: Number(product?.price ?? 0),
   displayImage: resolveProductImage(product?.image_url || product?.image) || null,
   displayStock: Number(product?.stock ?? 0),
+  images: Array.isArray(product?.images)
+    ? product.images.map((image) => ({ id: image.id, url: resolveProductImage(image.url) }))
+    : [],
 });
 
 const MerchantProductsPage = () => {
@@ -43,9 +49,7 @@ const MerchantProductsPage = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [deletingProduct, setDeletingProduct] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
 
   const loadProducts = useCallback(async () => {
@@ -125,18 +129,15 @@ const MerchantProductsPage = () => {
       stock: product?.stock != null ? String(product.stock) : '',
       lowStockThreshold: product?.low_stock_threshold != null ? String(product.low_stock_threshold) : '10',
       description: product?.description || '',
-      imageFile: null,
+      existingImages: Array.isArray(product?.images) ? product.images : [],
+      newImageFiles: [],
+      removeImageIds: [],
     });
     setIsFormDialogOpen(true);
   };
 
   const updateFormField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const openDeleteDialog = (product) => {
-    setDeletingProduct(product);
-    setIsDeleteDialogOpen(true);
   };
 
   const handleFormSubmit = async (event) => {
@@ -150,10 +151,23 @@ const MerchantProductsPage = () => {
     const rawThreshold = String(form.lowStockThreshold ?? '').trim();
     const parsedThreshold = rawThreshold === '' ? 10 : Number(rawThreshold);
 
-    if (!title || !category || Number.isNaN(parsedPrice) || Number.isNaN(parsedStock) || Number.isNaN(parsedThreshold)) {
+    if (
+      !title ||
+      !category ||
+      form.price === '' ||
+      form.stock === '' ||
+      !Number.isFinite(parsedPrice) ||
+      !Number.isFinite(parsedStock) ||
+      !Number.isFinite(parsedThreshold) ||
+      parsedPrice < 0 ||
+      parsedStock < 0 ||
+      parsedThreshold < 0 ||
+      !Number.isInteger(parsedStock) ||
+      !Number.isInteger(parsedThreshold)
+    ) {
       toast({
         title: 'Invalid form input',
-        description: 'Title, category, price, and stock are required.',
+        description: 'Enter a title and category, a valid price, and whole-number stock values.',
         variant: 'destructive',
       });
       return;
@@ -168,8 +182,11 @@ const MerchantProductsPage = () => {
       description,
     };
 
-    if (form.imageFile) {
-      payload.image = form.imageFile;
+    if (form.newImageFiles.length > 0) {
+      payload.images = form.newImageFiles;
+    }
+    if (editingProduct && form.removeImageIds.length > 0) {
+      payload.remove_image_ids = form.removeImageIds;
     }
 
     setIsMutating(true);
@@ -201,35 +218,18 @@ const MerchantProductsPage = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deletingProduct?.id) return;
-
-    setIsMutating(true);
-    try {
-      await deleteMerchantProduct(deletingProduct.id);
-      setProducts((prev) => prev.filter((item) => item.id !== deletingProduct.id));
-      toast({ title: 'Product deleted', description: `${deletingProduct.displayName} has been removed.`, variant: 'success' });
-      setIsDeleteDialogOpen(false);
-      setDeletingProduct(null);
-    } catch (error) {
-      toast({
-        title: 'Delete failed',
-        description: error?.message || 'Unable to delete this product.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card className="border-none bg-white/70 shadow-xl backdrop-blur-md">
         <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <CardTitle className="text-lg font-bold text-slate-800 sm:text-xl">My Products</CardTitle>
-            <p className="text-sm text-slate-500">View products in your store. Product management is currently restricted to administrators.</p>
+            <p className="text-sm text-slate-500">Add products to your storefront and keep their details up to date.</p>
           </div>
+          <Button type="button" onClick={openAddDialog} className="min-h-11 w-full gap-2 bg-[#2954C8] sm:w-auto">
+            <Plus className="h-4 w-4" />
+            Add product
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex gap-4">
@@ -252,7 +252,7 @@ const MerchantProductsPage = () => {
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Category</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Price</th>
                   <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Stock</th>
-                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Access</th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#ECF1FA]">
@@ -288,8 +288,18 @@ const MerchantProductsPage = () => {
                       <td className="px-6 py-4">
                         <p className="text-xs font-medium text-slate-600">{product.displayStock} {product.base_unit?.code || 'pc'} in stock</p>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[10px] font-medium text-slate-400 italic">View Only</span>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-slate-200"
+                          onClick={() => openEditDialog(product)}
+                          aria-label={`Edit ${product.displayName}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -326,8 +336,16 @@ const MerchantProductsPage = () => {
                         {product.displayCategory}
                       </Badge>
                       <span className="text-xs font-medium text-slate-600">{product.displayStock} {product.base_unit?.code || 'pc'} in stock</span>
-                      <span className="text-[10px] font-medium italic text-slate-400">View Only</span>
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-3 min-h-11 w-full gap-2 border-slate-200"
+                      onClick={() => openEditDialog(product)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit product
+                    </Button>
                   </div>
                 </div>
               ))
@@ -366,22 +384,21 @@ const MerchantProductsPage = () => {
                     Manage in Settings
                   </button>
                 </div>
-                <select
+                <Input
                   id="merchant-product-category"
+                  list="merchant-product-categories"
                   value={form.category}
                   onChange={(event) => updateFormField('category', event.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#2954C8] focus:ring-2 focus:ring-[#2954C8]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Select or enter a category"
                   required
-                >
-                  <option value="" disabled>
-                    {categories.length > 0 ? 'Select a category' : 'No categories available'}
-                  </option>
+                />
+                <datalist id="merchant-product-categories">
                   {categories.map((category) => (
                     <option key={category} value={category}>
                       {category}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div className="space-y-2">
@@ -442,12 +459,27 @@ const MerchantProductsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="merchant-product-image">Image</Label>
-              <Input
-                id="merchant-product-image"
-                type="file"
-                accept="image/*"
-                onChange={(event) => updateFormField('imageFile', event.target.files?.[0] || null)}
+              <Label>Images</Label>
+              <MultiImageUploader
+                existingImages={form.existingImages}
+                newFiles={form.newImageFiles}
+                disabled={isMutating}
+                onAddFiles={(files) =>
+                  setForm((prev) => ({ ...prev, newImageFiles: [...prev.newImageFiles, ...files] }))
+                }
+                onRemoveExisting={(imageId) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    existingImages: prev.existingImages.filter((image) => image.id !== imageId),
+                    removeImageIds: [...prev.removeImageIds, imageId],
+                  }))
+                }
+                onRemoveNewFile={(index) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    newImageFiles: prev.newImageFiles.filter((_, fileIndex) => fileIndex !== index),
+                  }))
+                }
               />
             </div>
 
@@ -463,27 +495,6 @@ const MerchantProductsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
-            <DialogDescription>
-              {deletingProduct
-                ? `Are you sure you want to delete "${deletingProduct.displayName}"? This action cannot be undone.`
-                : 'Are you sure you want to delete this product?'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isMutating}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={isMutating}>
-              {isMutating ? 'Deleting...' : 'Delete Product'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

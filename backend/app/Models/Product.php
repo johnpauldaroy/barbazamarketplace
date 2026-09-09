@@ -67,6 +67,11 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function activeVariants()
     {
         return $this->variants()->where('is_active', true);
