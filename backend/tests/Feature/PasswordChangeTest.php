@@ -69,4 +69,26 @@ class PasswordChangeTest extends TestCase
         $this->assertTrue(Hash::check('BrandNewPassword123', $user->password));
         $this->assertFalse(Hash::check('OldPassword123', $user->password));
     }
+
+    public function test_password_change_revokes_other_access_tokens(): void
+    {
+        $user = User::factory()->create([
+            'password' => Hash::make('OldPassword123'),
+        ]);
+
+        $otherToken = $user->createToken('other-device');
+        $currentToken = $user->createToken('current-device');
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$currentToken->plainTextToken)
+            ->patchJson('/api/user/password', [
+                'current_password' => 'OldPassword123',
+                'password' => 'BrandNewPassword123',
+                'password_confirmation' => 'BrandNewPassword123',
+            ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $otherToken->accessToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $currentToken->accessToken->id]);
+    }
 }

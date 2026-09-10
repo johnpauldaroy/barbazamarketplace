@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,7 +28,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'merchant' => \App\Http\Middleware\MerchantMiddleware::class,
         ]);
+
+        // This app has no web "login" route, so the framework default of
+        // redirecting guests to route('login') throws a RouteNotFoundException
+        // for any api/* request that doesn't send an Accept: application/json
+        // header (e.g. curl without headers). Never redirect; api/* callers
+        // get a JSON 401 via the AuthenticationException renderable below.
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+        });
     })->create();

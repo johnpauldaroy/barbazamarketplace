@@ -179,6 +179,11 @@ class AuthController extends Controller
         $user->password = Hash::make($payload['password']);
         $user->save();
 
+        $currentTokenId = $user->currentAccessToken()?->id;
+        $user->tokens()
+            ->when($currentTokenId, fn ($query) => $query->where('id', '!=', $currentTokenId))
+            ->delete();
+
         return response()->json([
             'message' => 'Password updated successfully',
         ]);

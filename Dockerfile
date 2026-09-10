@@ -49,7 +49,8 @@ RUN apk add --no-cache \
     pdo \
     pdo_mysql \
     zip \
-    && apk del .build-deps
+    && apk del .build-deps \
+    && echo "expose_php = Off" > /usr/local/etc/php/conf.d/expose-php.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
