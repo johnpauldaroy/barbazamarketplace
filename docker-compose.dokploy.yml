@@ -21,10 +21,10 @@ services:
       APP_NAME: "EkooMart"
       APP_ENV: production
       APP_DEBUG: "false"
-      APP_URL: https://ekoopmart.barbazampc.cloud
+      APP_URL: https://ekoopmart.coop
       APP_TIMEZONE: Asia/Singapore
       APP_KEY: ${APP_KEY}
-      FRONTEND_URL: https://ekoopmart.barbazampc.cloud
+      FRONTEND_URL: https://ekoopmart.coop
       LOG_CHANNEL: stderr
       LOG_LEVEL: info
       DB_CONNECTION: mysql
@@ -37,14 +37,14 @@ services:
       CACHE_STORE: database
       QUEUE_CONNECTION: sync
       MAIL_MAILER: resend
-      MAIL_FROM_ADDRESS: no-reply@barbazampc.cloud
+      MAIL_FROM_ADDRESS: no-reply@ekoopmart.coop
       MAIL_FROM_NAME: "e-KoopMart"
       RESEND_API_KEY: ${RESEND_API_KEY}
       AUTH_EMAIL_VERIFICATION_EXPIRE: "60"
       FILESYSTEM_DISK: public
       RUN_MIGRATIONS: "1"
       MIGRATION_MAX_ATTEMPTS: "30"
-      CORS_ALLOWED_ORIGINS: https://ekoopmart.barbazampc.cloud
+      CORS_ALLOWED_ORIGINS: https://ekoopmart.coop
       CORS_ALLOWED_ORIGINS_PATTERNS: ""
     volumes:
       - backend_storage:/var/www/html/storage

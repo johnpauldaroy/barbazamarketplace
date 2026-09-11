@@ -1,10 +1,10 @@
-# Deploy to Dokploy (`ekoopmart.barbazampc.cloud`)
+# Deploy to Dokploy (`ekoopmart.coop`)
 
 ## 1) DNS
 
-Create an `A` record:
+Create an `A` record for the apex domain:
 
-- Host/Name: `ekoopmart`
+- Host/Name: `@` (i.e. `ekoopmart.coop`)
 - Value: `<your dokploy server public IP>`
 - TTL: default
 
@@ -33,7 +33,7 @@ php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
 
 ## 4) Attach domain
 
-- Domain: `ekoopmart.barbazampc.cloud`
+- Domain: `ekoopmart.coop`
 - Target Service: `frontend`
 - Container Port: `80`
 - Enable HTTPS/SSL (Let's Encrypt)
@@ -50,6 +50,6 @@ No separate API domain is required for this stack.
 
 ## 6) Verify
 
-- Open `https://ekoopmart.barbazampc.cloud`
-- Check health endpoint: `https://ekoopmart.barbazampc.cloud/health`
+- Open `https://ekoopmart.coop`
+- Check health endpoint: `https://ekoopmart.coop/health`
 - Confirm browser Network tab shows successful `/api/...` requests.
