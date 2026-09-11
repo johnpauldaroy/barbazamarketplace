@@ -274,6 +274,24 @@ export const updateMerchantOrderStatus = async (id, status) => {
     }
 };
 
+export const fetchMerchantPushSettings = async () => {
+    return apiRequest('/merchant/push-subscriptions');
+};
+
+export const saveMerchantPushSubscription = async (subscription) => {
+    return apiRequest('/merchant/push-subscriptions', {
+        method: 'POST',
+        body: JSON.stringify(subscription),
+    });
+};
+
+export const removeMerchantPushSubscription = async (endpoint) => {
+    return apiRequest('/merchant/push-subscriptions', {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint }),
+    });
+};
+
 // Admin user management
 export const fetchAdminUsers = async (params = {}) => {
     return apiRequest(`/admin/users${buildQueryString(params)}`);

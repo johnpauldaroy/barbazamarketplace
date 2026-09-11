@@ -31,6 +31,7 @@ WORKDIR /var/www/html
 # System deps
 RUN apk add --no-cache \
     bash \
+    curl \
     nginx \
     supervisor \
     icu-libs \
@@ -39,12 +40,14 @@ RUN apk add --no-cache \
     mysql-client \
     && apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
+    curl-dev \
     icu-dev \
     libzip-dev \
     oniguruma-dev \
     mysql-dev \
     && docker-php-ext-install \
     bcmath \
+    curl \
     mbstring \
     pdo \
     pdo_mysql \

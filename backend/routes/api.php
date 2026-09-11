@@ -8,6 +8,7 @@ use App\Http\Controllers\MerchantInquiryController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\MerchantProductController;
 use App\Http\Controllers\MerchantPaymentMethodController;
+use App\Http\Controllers\MerchantPushSubscriptionController;
 use App\Http\Controllers\MerchantStoreController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderFeedbackController;
@@ -129,6 +130,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/merchant/categories', [MerchantProductController::class, 'storeCategory']);
             Route::get('/merchant/inquiries', [MerchantInquiryController::class, 'index']);
             Route::patch('/merchant/inquiries/{id}/status', [MerchantInquiryController::class, 'updateStatus']);
+            Route::get('/merchant/push-subscriptions', [MerchantPushSubscriptionController::class, 'index']);
+            Route::post('/merchant/push-subscriptions', [MerchantPushSubscriptionController::class, 'store']);
+            Route::delete('/merchant/push-subscriptions', [MerchantPushSubscriptionController::class, 'destroy']);
         });
     });
 });

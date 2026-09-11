@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\StorePaymentMethod;
 use App\Models\User;
+use App\Notifications\NewMerchantOrder;
 use App\Services\InventoryService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -811,6 +813,8 @@ class OrderController extends Controller
 
             $orders->each->load(['items.product.store', 'user', 'store', 'paymentSubmissions']);
 
+            $this->notifyMerchantsOfNewOrders($orders);
+
             $customerEmailNormalized = strtolower(trim((string) ($customerEmail ?: '')));
             if ($customerEmailNormalized !== '') {
                 $token = Str::random(64);
@@ -826,17 +830,20 @@ class OrderController extends Controller
                 $frontend = rtrim((string) config('app.frontend_url'), '/');
                 $feedbackUrl = "{$frontend}/feedback/{$token}";
 
-                try {
-                    Mail::to($customerEmailNormalized)->send(
-                        new OrderFeedbackInvitation($orders->first(), $feedbackUrl, $expiresAt->toISOString())
-                    );
-                } catch (\Throwable $mailError) {
-                    Log::warning('Order feedback invitation email failed', [
-                        'order_id' => $orders->first()->id,
-                        'email' => $customerEmailNormalized,
-                        'error' => $mailError->getMessage(),
-                    ]);
-                }
+                // Feedback invitation emails are disabled for now — the
+                // OrderFeedbackLink record above still lets customers use
+                // the feedback page directly if they're given the link.
+                // try {
+                //     Mail::to($customerEmailNormalized)->send(
+                //         new OrderFeedbackInvitation($orders->first(), $feedbackUrl, $expiresAt->toISOString())
+                //     );
+                // } catch (\Throwable $mailError) {
+                //     Log::warning('Order feedback invitation email failed', [
+                //         'order_id' => $orders->first()->id,
+                //         'email' => $customerEmailNormalized,
+                //         'error' => $mailError->getMessage(),
+                //     ]);
+                // }
             }
 
             return response()->json([
@@ -857,6 +864,35 @@ class OrderController extends Controller
             DB::rollBack();
 
             return response()->json(['message' => 'Order failed', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function notifyMerchantsOfNewOrders($orders): void
+    {
+        foreach ($orders as $order) {
+            try {
+                $merchants = User::query()
+                    ->where('store_id', $order->store_id)
+                    ->where('is_merchant', true)
+                    ->get();
+
+                if ($merchants->isNotEmpty()) {
+                    Notification::send($merchants, new NewMerchantOrder($order));
+                }
+
+                $contactEmail = strtolower(trim((string) $order->store?->contact_email));
+                $merchantEmails = $merchants->pluck('email')->map(fn ($email) => strtolower((string) $email));
+                if ($contactEmail !== '' && ! $merchantEmails->contains($contactEmail)) {
+                    Notification::route('mail', $contactEmail)->notify(new NewMerchantOrder($order));
+                }
+            } catch (\Throwable $notificationError) {
+                // A notification provider outage must never turn a committed order
+                // into an apparent checkout failure for the customer.
+                Log::error('Unable to queue new-order merchant notifications', [
+                    'order_id' => $order->id,
+                    'error' => $notificationError->getMessage(),
+                ]);
+            }
         }
     }
 

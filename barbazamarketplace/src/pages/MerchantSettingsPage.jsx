@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { useToast } from '../components/ui/use-toast';
 import { createMerchantCategory, fetchMerchantCategories, fetchMerchantStore, updateMerchantStore } from '../api/EcommerceApi';
 import MerchantPaymentMethodsPanel from '../components/MerchantPaymentMethodsPanel';
+import MerchantPushNotifications from '../components/MerchantPushNotifications';
 
 const EMPTY_STORE_FORM = {
   name: '',
@@ -209,6 +210,7 @@ const MerchantSettingsPage = () => {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-6">
+          <MerchantPushNotifications />
           <MerchantPaymentMethodsPanel />
           <Card className="border-none bg-white/70 shadow-lg backdrop-blur-md">
             <CardHeader>

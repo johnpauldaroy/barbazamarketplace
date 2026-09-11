@@ -16,16 +16,19 @@ WORKDIR /var/www/html
 
 RUN apk add --no-cache \
     bash \
+    curl \
     icu-libs \
     libzip \
     oniguruma \
     sqlite-libs \
     && apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
+    curl-dev \
     oniguruma-dev \
     sqlite-dev \
     && docker-php-ext-install \
     bcmath \
+    curl \
     mbstring \
     pcntl \
     pdo \

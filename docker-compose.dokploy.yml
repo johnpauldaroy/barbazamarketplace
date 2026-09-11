@@ -40,6 +40,9 @@ services:
       MAIL_FROM_ADDRESS: no-reply@ekoopmart.coop
       MAIL_FROM_NAME: "e-KoopMart"
       RESEND_API_KEY: ${RESEND_API_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@ekoopmart.coop}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       AUTH_EMAIL_VERIFICATION_EXPIRE: "60"
       FILESYSTEM_DISK: public
       RUN_MIGRATIONS: "1"
